@@ -4,15 +4,13 @@ using Ryujinx.HLE.FileSystem;
 using Ryujinx.HLE.HOS.Services.Account.Acc;
 using Ryujinx.Ui.Common.Configuration;
 using Ryujinx.Ui.Widgets;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Processing;
+using SkiaSharp;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using Image = SixLabors.ImageSharp.Image;
 
 namespace Ryujinx.Ui.Windows
 {
@@ -177,13 +175,21 @@ namespace Ryujinx.Ui.Windows
 
         private void ProcessProfileImage(byte[] buffer)
         {
-            using Image image = Image.Load(buffer);
+            using SKBitmap originalBitmap = SKBitmap.Decode(buffer);
 
-            image.Mutate(x => x.Resize(256, 256));
+            using SKBitmap resizedBitmap = new SKBitmap(256, 256);
+
+            using SKCanvas canvas = new SKCanvas(resizedBitmap);
+            canvas.Clear(SKColors.Transparent);
+
+            canvas.DrawBitmap(originalBitmap, new SKRect(0, 0, 256, 256));
+
+            using SKImage resizedImage = SKImage.FromBitmap(resizedBitmap);
 
             using MemoryStream streamJpg = MemoryStreamManager.Shared.GetStream();
+            using SKData encodedData = resizedImage.Encode(SKEncodedImageFormat.Jpeg, 100);
 
-            image.SaveAsJpeg(streamJpg);
+            encodedData.SaveTo(streamJpg);
 
             _bufferImageProfile = streamJpg.ToArray();
         }

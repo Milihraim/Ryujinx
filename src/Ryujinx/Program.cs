@@ -12,7 +12,6 @@ using Ryujinx.Ui.Common.Configuration;
 using Ryujinx.Ui.Common.Helper;
 using Ryujinx.Ui.Common.SystemInfo;
 using Ryujinx.Ui.Widgets;
-using SixLabors.ImageSharp.Formats.Jpeg;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -160,12 +159,6 @@ namespace Ryujinx
                     action();
                 });
             };
-
-            // Sets ImageSharp Jpeg Encoder Quality.
-            SixLabors.ImageSharp.Configuration.Default.ImageFormatsManager.SetEncoder(JpegFormat.Instance, new JpegEncoder()
-            {
-                Quality = 100,
-            });
 
             string localConfigurationPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Config.json");
             string appDataConfigurationPath = Path.Combine(AppDataManager.BaseDirPath, "Config.json");

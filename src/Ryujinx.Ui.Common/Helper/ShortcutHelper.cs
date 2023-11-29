@@ -1,8 +1,7 @@
 ﻿using Ryujinx.Common;
 using Ryujinx.Common.Configuration;
 using ShellLink;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using SkiaSharp;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -42,8 +41,13 @@ namespace Ryujinx.Ui.Common.Helper
             var desktopFile = EmbeddedResources.ReadAllText("Ryujinx.Ui.Common/shortcut-template.desktop");
             iconPath += ".png";
 
-            var image = SixLabors.ImageSharp.Image.Load<Rgba32>(iconData);
-            image.SaveAsPng(iconPath);
+            using var bitmap = SKBitmap.Decode(iconData);
+            using var image = SKImage.FromBitmap(bitmap);
+            using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+            using (var fileStream = new FileStream(iconPath, FileMode.Create, FileAccess.Write))
+            {
+                data.SaveTo(fileStream);
+            }
 
             using StreamWriter outputFile = new(Path.Combine(desktopPath, cleanedAppName + ".desktop"));
             outputFile.Write(desktopFile, cleanedAppName, iconPath, $"{basePath} {GetArgsString(applicationFilePath)}");
@@ -83,8 +87,13 @@ namespace Ryujinx.Ui.Common.Helper
             }
 
             const string IconName = "icon.png";
-            var image = SixLabors.ImageSharp.Image.Load<Rgba32>(iconData);
-            image.SaveAsPng(Path.Combine(resourceFolderPath, IconName));
+            using var bitmap = SKBitmap.Decode(iconData);
+            using var image = SKImage.FromBitmap(bitmap);
+            using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+            using (var fileStream = new FileStream(resourceFolderPath, FileMode.Create, FileAccess.Write))
+            {
+                data.SaveTo(fileStream);
+            }
 
             // plist file
             using StreamWriter outputFile = new(Path.Combine(contentFolderPath, "Info.plist"));

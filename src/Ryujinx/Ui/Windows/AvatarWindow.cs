@@ -9,16 +9,13 @@ using LibHac.Tools.FsSystem.NcaUtils;
 using Ryujinx.Common.Memory;
 using Ryujinx.HLE.FileSystem;
 using Ryujinx.Ui.Common.Configuration;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Png;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
+using SkiaSharp;
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
-using Image = SixLabors.ImageSharp.Image;
+using Image = SkiaSharp.SKImage;
 
 namespace Ryujinx.Ui.Windows
 {
@@ -144,9 +141,12 @@ namespace Ryujinx.Ui.Windows
 
                         stream.Position = 0;
 
-                        Image avatarImage = Image.LoadPixelData<Rgba32>(DecompressYaz0(stream), 256, 256);
+                        Image avatarImage = Image.FromPixelCopy(new SKImageInfo(256, 256, SKColorType.Rgba8888, SKAlphaType.Premul), DecompressYaz0(stream));
 
-                        avatarImage.SaveAsPng(streamPng);
+                        using (SKData data = avatarImage.Encode(SKEncodedImageFormat.Png, 100))
+                        {
+                            data.SaveTo(streamPng);
+                        }
 
                         _avatarDict.Add(item.FullPath, streamPng.ToArray());
                     }
@@ -168,17 +168,26 @@ namespace Ryujinx.Ui.Windows
 
         private byte[] ProcessImage(byte[] data)
         {
-            using MemoryStream streamJpg = MemoryStreamManager.Shared.GetStream();
+            using var streamJpg = MemoryStreamManager.Shared.GetStream();
+            using var bitmap = SKBitmap.Decode(data);
 
-            Image avatarImage = Image.Load(data, new PngDecoder());
+            using var newBitmap = new SKBitmap(bitmap.Width, bitmap.Height);
+            using (var canvas = new SKCanvas(newBitmap))
+            {
+                canvas.Clear(new SKColor(
+                    (byte)(_backgroundColor.Red * 255),
+                    (byte)(_backgroundColor.Green * 255),
+                    (byte)(_backgroundColor.Blue * 255),
+                    (byte)(_backgroundColor.Alpha * 255)
+                ));
+                canvas.DrawBitmap(bitmap, 0, 0);
+            }
 
-            avatarImage.Mutate(x => x.BackgroundColor(new Rgba32(
-                (byte)(_backgroundColor.Red * 255),
-                (byte)(_backgroundColor.Green * 255),
-                (byte)(_backgroundColor.Blue * 255),
-                (byte)(_backgroundColor.Alpha * 255)
-            )));
-            avatarImage.SaveAsJpeg(streamJpg);
+            using (var image = SKImage.FromBitmap(newBitmap))
+            using (var dataJpeg = image.Encode(SKEncodedImageFormat.Jpeg, 100))
+            {
+                dataJpeg.SaveTo(streamJpg);
+            }
 
             return streamJpg.ToArray();
         }
