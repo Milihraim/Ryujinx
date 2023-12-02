@@ -119,15 +119,15 @@ namespace Ryujinx.HLE.HOS.Services.Caps
                 // NOTE: The saved JPEG file doesn't have the limitation in the extra EXIF data.
                 using (var image = SKImage.FromPixelCopy(new SKImageInfo(1280, 720), screenshotData))
                 {
-                        using (var data = image.Encode(SKEncodedImageFormat.Jpeg, 100)) // 100 is the quality setting
+                    using (var data = image.Encode(SKEncodedImageFormat.Jpeg, 100)) // 100 is the quality setting
+                    {
+                        using (var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write))
                         {
-                            using (var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write))
-                            {
-                                data.SaveTo(fileStream);
-                            }
+                            data.SaveTo(fileStream);
                         }
+                    }
                 }
-                
+
                 return ResultCode.Success;
             }
 
