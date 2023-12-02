@@ -41,12 +41,14 @@ namespace Ryujinx.Ui.Common.Helper
             var desktopFile = EmbeddedResources.ReadAllText("Ryujinx.Ui.Common/shortcut-template.desktop");
             iconPath += ".png";
 
-            using var bitmap = SKBitmap.Decode(iconData);
-            using var image = SKImage.FromBitmap(bitmap);
-            using var data = image.Encode(SKEncodedImageFormat.Png, 100);
-            using (var fileStream = new FileStream(iconPath, FileMode.Create, FileAccess.Write))
+            var image = SKImage.FromEncodedData(iconData);
+
+            using (var data = image.Encode(SKEncodedImageFormat.Png, 100))
             {
-                data.SaveTo(fileStream);
+                using (var stream = File.OpenWrite(iconPath))
+                {
+                    data.SaveTo(stream);
+                }
             }
 
             using StreamWriter outputFile = new(Path.Combine(desktopPath, cleanedAppName + ".desktop"));
@@ -87,12 +89,14 @@ namespace Ryujinx.Ui.Common.Helper
             }
 
             const string IconName = "icon.png";
-            using var bitmap = SKBitmap.Decode(iconData);
-            using var image = SKImage.FromBitmap(bitmap);
-            using var data = image.Encode(SKEncodedImageFormat.Png, 100);
-            using (var fileStream = new FileStream(resourceFolderPath, FileMode.Create, FileAccess.Write))
+            var image = SKImage.FromEncodedData(iconData);
+
+            using (var data = image.Encode(SKEncodedImageFormat.Png, 100))
             {
-                data.SaveTo(fileStream);
+                using (var stream = File.OpenWrite(Path.Combine(resourceFolderPath, IconName)))
+                {
+                    data.SaveTo(stream);
+                }
             }
 
             // plist file
