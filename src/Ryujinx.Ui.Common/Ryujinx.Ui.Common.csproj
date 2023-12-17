@@ -57,6 +57,7 @@
     <PackageReference Include="DiscordRichPresence" />
     <PackageReference Include="securifybv.ShellLink" />
     <PackageReference Include="SkiaSharp" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" />
     <PackageReference Include="System.Drawing.Common" />
   </ItemGroup>
 
