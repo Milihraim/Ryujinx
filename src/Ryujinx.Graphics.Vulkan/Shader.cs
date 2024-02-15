@@ -1,7 +1,7 @@
 using Ryujinx.Common.Logging;
 using Ryujinx.Graphics.GAL;
 using Ryujinx.Graphics.Shader;
-using shaderc;
+using Silk.NET.Shaderc;
 using Silk.NET.Vulkan;
 using System;
 using System.Runtime.InteropServices;
@@ -11,9 +11,6 @@ namespace Ryujinx.Graphics.Vulkan
 {
     class Shader : IDisposable
     {
-        // The shaderc.net dependency's Options constructor and dispose are not thread safe.
-        // Take this lock when using them.
-        private static readonly object _shaderOptionsLock = new();
 
         private static readonly IntPtr _ptrMainEntryPointName = Marshal.StringToHGlobalAnsi("main");
 
@@ -73,39 +70,42 @@ namespace Ryujinx.Graphics.Vulkan
 
         private unsafe static byte[] GlslToSpirv(string glsl, ShaderStage stage)
         {
-            Options options;
+            var api = Shaderc.GetApi();
+            var compile = api.CompilerInitialize();
+            var options = api.CompileOptionsInitialize();
+            api.CompileOptionsSetSourceLanguage(options, SourceLanguage.Glsl);
+            api.CompileOptionsSetTargetSpirv(options, SpirvVersion.Shaderc15);
+            api.CompileOptionsSetTargetEnv(options, TargetEnv.Vulkan, Vk.Version12);
+            api.CompileOptionsSetOptimizationLevel(options, OptimizationLevel.Performance);
+            
+            var shaderKind = GetShaderCShaderStage(stage);
 
-            lock (_shaderOptionsLock)
+            IntPtr glslPtr = Marshal.StringToHGlobalAnsi(glsl);
+            int ansiLength = System.Text.Encoding.Default.GetByteCount(glsl);
+
+            var scr = api.CompileIntoSpv(compile, (byte*)glslPtr, (UIntPtr)ansiLength, shaderKind, "Ryu", (byte*)_ptrMainEntryPointName, options);
+            
+            Marshal.FreeHGlobal(glslPtr);
+
+            if (api.ResultGetCompilationStatus(scr) != CompilationStatus.Success)
             {
-                options = new Options(false)
-                {
-                    SourceLanguage = SourceLanguage.Glsl,
-                    TargetSpirVVersion = new SpirVVersion(1, 5),
-                };
-            }
-
-            options.SetTargetEnvironment(TargetEnvironment.Vulkan, EnvironmentVersion.Vulkan_1_2);
-            Compiler compiler = new(options);
-            var scr = compiler.Compile(glsl, "Ryu", GetShaderCShaderStage(stage));
-
-            lock (_shaderOptionsLock)
-            {
-                options.Dispose();
-            }
-
-            if (scr.Status != Status.Success)
-            {
-                Logger.Error?.Print(LogClass.Gpu, $"Shader compilation error: {scr.Status} {scr.ErrorMessage}");
+                Logger.Error?.Print(LogClass.Gpu, $"Shader compilation error: {api.ResultGetCompilationStatus(scr)} {api.ResultGetErrorMessageS(scr)}");
+                api.CompileOptionsRelease(options);
+                api.CompilerRelease(compile);
+                api.Dispose();
 
                 return null;
             }
 
-            var spirvBytes = new Span<byte>((void*)scr.CodePointer, (int)scr.CodeLength);
+            var spirvBytes = new Span<byte>(api.ResultGetBytes(scr), (int)api.ResultGetLength(scr));
 
-            byte[] code = new byte[(scr.CodeLength + 3) & ~3];
+            byte[] code = new byte[((uint)api.ResultGetLength(scr) + 3) & ~3];
 
-            spirvBytes.CopyTo(code.AsSpan()[..(int)scr.CodeLength]);
-
+            spirvBytes.CopyTo(code.AsSpan()[..(int)api.ResultGetLength(scr)]);
+            
+            api.CompileOptionsRelease(options);
+            api.CompilerRelease(compile);
+            api.Dispose();
             return code;
         }
 
@@ -129,7 +129,7 @@ namespace Ryujinx.Graphics.Vulkan
 
             Logger.Debug?.Print(LogClass.Gpu, $"Invalid {nameof(ShaderStage)} enum value: {stage}.");
 
-            return ShaderKind.GlslVertexShader;
+            return ShaderKind.GlslDefaultVertexShader;
         }
 
         public unsafe PipelineShaderStageCreateInfo GetInfo()

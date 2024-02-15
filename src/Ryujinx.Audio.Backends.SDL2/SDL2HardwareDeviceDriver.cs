@@ -3,12 +3,12 @@ using Ryujinx.Audio.Integration;
 using Ryujinx.Common.Logging;
 using Ryujinx.Memory;
 using Ryujinx.SDL2.Common;
+using Silk.NET.SDL;
 using System;
 using System.Collections.Concurrent;
-using System.Runtime.InteropServices;
 using System.Threading;
 using static Ryujinx.Audio.Integration.IHardwareDeviceDriver;
-using static SDL2.SDL;
+
 
 namespace Ryujinx.Audio.Backends.SDL2
 {
@@ -19,15 +19,9 @@ namespace Ryujinx.Audio.Backends.SDL2
         private readonly ConcurrentDictionary<SDL2HardwareDeviceSession, byte> _sessions;
 
         private readonly bool _supportSurroundConfiguration;
+        public static Sdl sdl_Driver = SDL2Driver.SdlApi;
 
-        // TODO: Add this to SDL2-CS
-        // NOTE: We use a DllImport here because of marshaling issue for spec.
-#pragma warning disable SYSLIB1054
-        [DllImport("SDL2")]
-        private static extern int SDL_GetDefaultAudioInfo(IntPtr name, out SDL_AudioSpec spec, int isCapture);
-#pragma warning restore SYSLIB1054
-
-        public SDL2HardwareDeviceDriver()
+        public unsafe SDL2HardwareDeviceDriver()
         {
             _updateRequiredEvent = new ManualResetEvent(false);
             _pauseEvent = new ManualResetEvent(true);
@@ -35,18 +29,22 @@ namespace Ryujinx.Audio.Backends.SDL2
 
             SDL2Driver.Instance.Initialize();
 
-            int res = SDL_GetDefaultAudioInfo(IntPtr.Zero, out var spec, 0);
+
+            AudioSpec spec;
+            byte* nullBytePointer = null;
+            byte** nullBytePointerPointer = &nullBytePointer; 
+            int res = sdl_Driver.GetDefaultAudioInfo(nullBytePointerPointer, &spec, 0); 
 
             if (res != 0)
             {
                 Logger.Error?.Print(LogClass.Application,
-                    $"SDL_GetDefaultAudioInfo failed with error \"{SDL_GetError()}\"");
+                    $"SDL_GetDefaultAudioInfo failed with error \"{sdl_Driver.GetErrorS()}\"");
 
                 _supportSurroundConfiguration = true;
             }
             else
             {
-                _supportSurroundConfiguration = spec.channels >= 6;
+                _supportSurroundConfiguration = spec.Channels >= 6;
             }
         }
 
@@ -54,14 +52,42 @@ namespace Ryujinx.Audio.Backends.SDL2
 
         private static bool IsSupportedInternal()
         {
-            uint device = OpenStream(SampleFormat.PcmInt16, Constants.TargetSampleRate, Constants.ChannelCountMax, Constants.TargetSampleCount, null);
+            uint device = OpenStream(SampleFormat.PcmInt16, Constants.TargetSampleRate, Constants.ChannelCountMax, Constants.TargetSampleCount);
 
             if (device != 0)
             {
-                SDL_CloseAudioDevice(device);
+                sdl_Driver.CloseAudioDevice(device);
             }
 
             return device != 0;
+        }
+
+        internal static unsafe uint OpenStream(SampleFormat requestedSampleFormat, uint requestedSampleRate, uint requestedChannelCount, uint sampleCount)
+        {
+            AudioSpec desired = GetSDL2Spec(requestedSampleFormat, requestedSampleRate, requestedChannelCount, sampleCount);
+            
+            AudioSpec got;
+
+            uint device = sdl_Driver.OpenAudioDevice((byte*)null, 0, in desired, &got, 0);
+
+            if (device == 0)
+            {
+                Logger.Error?.Print(LogClass.Application, $"SDL2 open audio device initialization failed with error \"{sdl_Driver.GetErrorS()}\"");
+
+                return 0;
+            }
+
+            bool isValid = got.Format == desired.Format && got.Freq == desired.Freq && got.Channels == desired.Channels;
+
+            if (!isValid)
+            {
+                Logger.Error?.Print(LogClass.Application, "SDL2 open audio device is not valid");
+                sdl_Driver.CloseAudioDevice(device);
+
+                return 0;
+            }
+
+            return device;
         }
 
         public ManualResetEvent GetUpdateRequiredEvent()
@@ -103,14 +129,14 @@ namespace Ryujinx.Audio.Backends.SDL2
             return _sessions.TryRemove(session, out _);
         }
 
-        private static SDL_AudioSpec GetSDL2Spec(SampleFormat requestedSampleFormat, uint requestedSampleRate, uint requestedChannelCount, uint sampleCount)
+        private static AudioSpec GetSDL2Spec(SampleFormat requestedSampleFormat, uint requestedSampleRate, uint requestedChannelCount, uint sampleCount)
         {
-            return new SDL_AudioSpec
+            return new AudioSpec()
             {
-                channels = (byte)requestedChannelCount,
-                format = GetSDL2Format(requestedSampleFormat),
-                freq = (int)requestedSampleRate,
-                samples = (ushort)sampleCount,
+                Channels = (byte)requestedChannelCount,
+                Format = GetSDL2Format(requestedSampleFormat),
+                Freq = (int)requestedSampleRate,
+                Samples = (ushort)sampleCount,
             };
         }
 
@@ -118,35 +144,37 @@ namespace Ryujinx.Audio.Backends.SDL2
         {
             return format switch
             {
-                SampleFormat.PcmInt8 => AUDIO_S8,
-                SampleFormat.PcmInt16 => AUDIO_S16,
-                SampleFormat.PcmInt32 => AUDIO_S32,
-                SampleFormat.PcmFloat => AUDIO_F32,
+                SampleFormat.PcmInt8 => Sdl.AudioS8,
+                SampleFormat.PcmInt16 => Sdl.AudioS16,
+                SampleFormat.PcmInt32 => Sdl.AudioS32,
+                SampleFormat.PcmFloat => Sdl.AudioF32,
                 _ => throw new ArgumentException($"Unsupported sample format {format}"),
             };
         }
 
-        internal static uint OpenStream(SampleFormat requestedSampleFormat, uint requestedSampleRate, uint requestedChannelCount, uint sampleCount, SDL_AudioCallback callback)
+        internal static unsafe uint OpenStream(SampleFormat requestedSampleFormat, uint requestedSampleRate, uint requestedChannelCount, uint sampleCount, AudioCallback callback)
         {
-            SDL_AudioSpec desired = GetSDL2Spec(requestedSampleFormat, requestedSampleRate, requestedChannelCount, sampleCount);
+            AudioSpec desired = GetSDL2Spec(requestedSampleFormat, requestedSampleRate, requestedChannelCount, sampleCount);
 
-            desired.callback = callback;
+            desired.Callback = callback;
+            
+            AudioSpec got;
 
-            uint device = SDL_OpenAudioDevice(IntPtr.Zero, 0, ref desired, out SDL_AudioSpec got, 0);
+            uint device = sdl_Driver.OpenAudioDevice((byte*)null, 0, in desired, &got, 0);
 
             if (device == 0)
             {
-                Logger.Error?.Print(LogClass.Application, $"SDL2 open audio device initialization failed with error \"{SDL_GetError()}\"");
+                Logger.Error?.Print(LogClass.Application, $"SDL2 open audio device initialization failed with error \"{sdl_Driver.GetErrorS()}\"");
 
                 return 0;
             }
 
-            bool isValid = got.format == desired.format && got.freq == desired.freq && got.channels == desired.channels;
+            bool isValid = got.Format == desired.Format && got.Freq == desired.Freq && got.Channels == desired.Channels;
 
             if (!isValid)
             {
                 Logger.Error?.Print(LogClass.Application, "SDL2 open audio device is not valid");
-                SDL_CloseAudioDevice(device);
+                sdl_Driver.CloseAudioDevice(device);
 
                 return 0;
             }
@@ -168,6 +196,7 @@ namespace Ryujinx.Audio.Backends.SDL2
                 {
                     session.Dispose();
                 }
+                sdl_Driver?.Dispose();
 
                 SDL2Driver.Instance.Dispose();
 

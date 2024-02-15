@@ -1,10 +1,9 @@
-using OpenTK.Audio.OpenAL;
 using Ryujinx.Audio.Common;
 using Ryujinx.Audio.Integration;
 using Ryujinx.Memory;
+using Silk.NET.OpenAL;
 using System;
 using System.Collections.Concurrent;
-using System.Linq;
 using System.Threading;
 using static Ryujinx.Audio.Integration.IHardwareDeviceDriver;
 
@@ -12,18 +11,20 @@ namespace Ryujinx.Audio.Backends.OpenAL
 {
     public class OpenALHardwareDeviceDriver : IHardwareDeviceDriver
     {
-        private readonly ALDevice _device;
-        private readonly ALContext _context;
+        private readonly unsafe Context* _context;
+        private ALContext _alc;
+        private unsafe Device* device;
         private readonly ManualResetEvent _updateRequiredEvent;
         private readonly ManualResetEvent _pauseEvent;
         private readonly ConcurrentDictionary<OpenALHardwareDeviceSession, byte> _sessions;
         private bool _stillRunning;
         private readonly Thread _updaterThread;
 
-        public OpenALHardwareDeviceDriver()
+        public unsafe OpenALHardwareDeviceDriver()
         {
-            _device = ALC.OpenDevice("");
-            _context = ALC.CreateContext(_device, new ALContextAttributes());
+            _alc = ALContext.GetApi();
+            device = _alc.OpenDevice("");
+            _context = _alc.CreateContext(device, null);
             _updateRequiredEvent = new ManualResetEvent(false);
             _pauseEvent = new ManualResetEvent(true);
             _sessions = new ConcurrentDictionary<OpenALHardwareDeviceSession, byte>();
@@ -37,13 +38,20 @@ namespace Ryujinx.Audio.Backends.OpenAL
             _updaterThread.Start();
         }
 
-        public static bool IsSupported
+        public static unsafe bool IsSupported
         {
             get
             {
                 try
                 {
-                    return ALC.GetStringList(GetEnumerationStringList.DeviceSpecifier).Any();
+                    var alc = ALContext.GetApi();
+                    var _device = alc.OpenDevice("");
+
+                    if (alc.IsExtensionPresent(_device, "ALC_ENUMERATION_EXT") == false)
+                    {
+                        return false;
+                    }
+                    return true;
                 }
                 catch
                 {
@@ -95,9 +103,9 @@ namespace Ryujinx.Audio.Backends.OpenAL
             return _pauseEvent;
         }
 
-        private void Update()
+        private unsafe void Update()
         {
-            ALC.MakeContextCurrent(_context);
+            _alc.MakeContextCurrent(_context);
 
             while (_stillRunning)
             {
@@ -127,7 +135,7 @@ namespace Ryujinx.Audio.Backends.OpenAL
             Dispose(true);
         }
 
-        protected virtual void Dispose(bool disposing)
+        protected virtual unsafe void Dispose(bool disposing)
         {
             if (disposing)
             {
@@ -138,8 +146,8 @@ namespace Ryujinx.Audio.Backends.OpenAL
                     session.Dispose();
                 }
 
-                ALC.DestroyContext(_context);
-                ALC.CloseDevice(_device);
+                _alc.DestroyContext(_context);
+                _alc.CloseDevice(device);
 
                 _pauseEvent.Dispose();
             }

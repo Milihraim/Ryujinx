@@ -1,10 +1,10 @@
 using Ryujinx.Common.Configuration.Hid;
 using Ryujinx.Common.Configuration.Hid.Keyboard;
+using Silk.NET.SDL;
 using System;
 using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using static SDL2.SDL;
 
 using ConfigKey = Ryujinx.Common.Configuration.Hid.Key;
 
@@ -31,147 +31,149 @@ namespace Ryujinx.Input.SDL2
 #pragma warning restore IDE0052
         private StandardKeyboardInputConfig _configuration;
         private readonly List<ButtonMappingEntry> _buttonsUserMapping;
+        private static Sdl _sdl = Sdl.GetApi();
 
-        private static readonly SDL_Keycode[] _keysDriverMapping = new SDL_Keycode[(int)Key.Count]
+
+        private static readonly KeyCode[] _keysDriverMapping = new KeyCode[(int)Key.Count]
         {
             // INVALID
-            SDL_Keycode.SDLK_0,
+            KeyCode.K0,
             // Presented as modifiers, so invalid here.
-            SDL_Keycode.SDLK_0,
-            SDL_Keycode.SDLK_0,
-            SDL_Keycode.SDLK_0,
-            SDL_Keycode.SDLK_0,
-            SDL_Keycode.SDLK_0,
-            SDL_Keycode.SDLK_0,
-            SDL_Keycode.SDLK_0,
-            SDL_Keycode.SDLK_0,
-            SDL_Keycode.SDLK_0,
+            KeyCode.K0,
+            KeyCode.K0,
+            KeyCode.K0,
+            KeyCode.K0,
+            KeyCode.K0,
+            KeyCode.K0,
+            KeyCode.K0,
+            KeyCode.K0,
+            KeyCode.K0,
 
-            SDL_Keycode.SDLK_F1,
-            SDL_Keycode.SDLK_F2,
-            SDL_Keycode.SDLK_F3,
-            SDL_Keycode.SDLK_F4,
-            SDL_Keycode.SDLK_F5,
-            SDL_Keycode.SDLK_F6,
-            SDL_Keycode.SDLK_F7,
-            SDL_Keycode.SDLK_F8,
-            SDL_Keycode.SDLK_F9,
-            SDL_Keycode.SDLK_F10,
-            SDL_Keycode.SDLK_F11,
-            SDL_Keycode.SDLK_F12,
-            SDL_Keycode.SDLK_F13,
-            SDL_Keycode.SDLK_F14,
-            SDL_Keycode.SDLK_F15,
-            SDL_Keycode.SDLK_F16,
-            SDL_Keycode.SDLK_F17,
-            SDL_Keycode.SDLK_F18,
-            SDL_Keycode.SDLK_F19,
-            SDL_Keycode.SDLK_F20,
-            SDL_Keycode.SDLK_F21,
-            SDL_Keycode.SDLK_F22,
-            SDL_Keycode.SDLK_F23,
-            SDL_Keycode.SDLK_F24,
+            KeyCode.KF1,
+            KeyCode.KF2,
+            KeyCode.KF3,
+            KeyCode.KF4,
+            KeyCode.KF5,
+            KeyCode.KF6,
+            KeyCode.KF7,
+            KeyCode.KF8,
+            KeyCode.KF9,
+            KeyCode.KF10,
+            KeyCode.KF11,
+            KeyCode.KF12,
+            KeyCode.KF13,
+            KeyCode.KF14,
+            KeyCode.KF15,
+            KeyCode.KF16,
+            KeyCode.KF17,
+            KeyCode.KF18,
+            KeyCode.KF19,
+            KeyCode.KF20,
+            KeyCode.KF21,
+            KeyCode.KF22,
+            KeyCode.KF23,
+            KeyCode.KF24,
 
-            SDL_Keycode.SDLK_0,
-            SDL_Keycode.SDLK_0,
-            SDL_Keycode.SDLK_0,
-            SDL_Keycode.SDLK_0,
-            SDL_Keycode.SDLK_0,
-            SDL_Keycode.SDLK_0,
-            SDL_Keycode.SDLK_0,
-            SDL_Keycode.SDLK_0,
-            SDL_Keycode.SDLK_0,
-            SDL_Keycode.SDLK_0,
-            SDL_Keycode.SDLK_0,
+            KeyCode.K0,
+            KeyCode.K0,
+            KeyCode.K0,
+            KeyCode.K0,
+            KeyCode.K0,
+            KeyCode.K0,
+            KeyCode.K0,
+            KeyCode.K0,
+            KeyCode.K0,
+            KeyCode.K0,
+            KeyCode.K0,
 
-            SDL_Keycode.SDLK_UP,
-            SDL_Keycode.SDLK_DOWN,
-            SDL_Keycode.SDLK_LEFT,
-            SDL_Keycode.SDLK_RIGHT,
-            SDL_Keycode.SDLK_RETURN,
-            SDL_Keycode.SDLK_ESCAPE,
-            SDL_Keycode.SDLK_SPACE,
-            SDL_Keycode.SDLK_TAB,
-            SDL_Keycode.SDLK_BACKSPACE,
-            SDL_Keycode.SDLK_INSERT,
-            SDL_Keycode.SDLK_DELETE,
-            SDL_Keycode.SDLK_PAGEUP,
-            SDL_Keycode.SDLK_PAGEDOWN,
-            SDL_Keycode.SDLK_HOME,
-            SDL_Keycode.SDLK_END,
-            SDL_Keycode.SDLK_CAPSLOCK,
-            SDL_Keycode.SDLK_SCROLLLOCK,
-            SDL_Keycode.SDLK_PRINTSCREEN,
-            SDL_Keycode.SDLK_PAUSE,
-            SDL_Keycode.SDLK_NUMLOCKCLEAR,
-            SDL_Keycode.SDLK_CLEAR,
-            SDL_Keycode.SDLK_KP_0,
-            SDL_Keycode.SDLK_KP_1,
-            SDL_Keycode.SDLK_KP_2,
-            SDL_Keycode.SDLK_KP_3,
-            SDL_Keycode.SDLK_KP_4,
-            SDL_Keycode.SDLK_KP_5,
-            SDL_Keycode.SDLK_KP_6,
-            SDL_Keycode.SDLK_KP_7,
-            SDL_Keycode.SDLK_KP_8,
-            SDL_Keycode.SDLK_KP_9,
-            SDL_Keycode.SDLK_KP_DIVIDE,
-            SDL_Keycode.SDLK_KP_MULTIPLY,
-            SDL_Keycode.SDLK_KP_MINUS,
-            SDL_Keycode.SDLK_KP_PLUS,
-            SDL_Keycode.SDLK_KP_DECIMAL,
-            SDL_Keycode.SDLK_KP_ENTER,
-            SDL_Keycode.SDLK_a,
-            SDL_Keycode.SDLK_b,
-            SDL_Keycode.SDLK_c,
-            SDL_Keycode.SDLK_d,
-            SDL_Keycode.SDLK_e,
-            SDL_Keycode.SDLK_f,
-            SDL_Keycode.SDLK_g,
-            SDL_Keycode.SDLK_h,
-            SDL_Keycode.SDLK_i,
-            SDL_Keycode.SDLK_j,
-            SDL_Keycode.SDLK_k,
-            SDL_Keycode.SDLK_l,
-            SDL_Keycode.SDLK_m,
-            SDL_Keycode.SDLK_n,
-            SDL_Keycode.SDLK_o,
-            SDL_Keycode.SDLK_p,
-            SDL_Keycode.SDLK_q,
-            SDL_Keycode.SDLK_r,
-            SDL_Keycode.SDLK_s,
-            SDL_Keycode.SDLK_t,
-            SDL_Keycode.SDLK_u,
-            SDL_Keycode.SDLK_v,
-            SDL_Keycode.SDLK_w,
-            SDL_Keycode.SDLK_x,
-            SDL_Keycode.SDLK_y,
-            SDL_Keycode.SDLK_z,
-            SDL_Keycode.SDLK_0,
-            SDL_Keycode.SDLK_1,
-            SDL_Keycode.SDLK_2,
-            SDL_Keycode.SDLK_3,
-            SDL_Keycode.SDLK_4,
-            SDL_Keycode.SDLK_5,
-            SDL_Keycode.SDLK_6,
-            SDL_Keycode.SDLK_7,
-            SDL_Keycode.SDLK_8,
-            SDL_Keycode.SDLK_9,
-            SDL_Keycode.SDLK_BACKQUOTE,
-            SDL_Keycode.SDLK_BACKQUOTE,
-            SDL_Keycode.SDLK_MINUS,
-            SDL_Keycode.SDLK_PLUS,
-            SDL_Keycode.SDLK_LEFTBRACKET,
-            SDL_Keycode.SDLK_RIGHTBRACKET,
-            SDL_Keycode.SDLK_SEMICOLON,
-            SDL_Keycode.SDLK_QUOTE,
-            SDL_Keycode.SDLK_COMMA,
-            SDL_Keycode.SDLK_PERIOD,
-            SDL_Keycode.SDLK_SLASH,
-            SDL_Keycode.SDLK_BACKSLASH,
+            KeyCode.KUp,
+            KeyCode.KDown,
+            KeyCode.KLeft,
+            KeyCode.KRight,
+            KeyCode.KReturn,
+            KeyCode.KEscape,
+            KeyCode.KSpace,
+            KeyCode.KTab,
+            KeyCode.KBackspace,
+            KeyCode.KInsert,
+            KeyCode.KDelete,
+            KeyCode.KPageup,
+            KeyCode.KPagedown,
+            KeyCode.KHome,
+            KeyCode.KEnd,
+            KeyCode.KCapslock,
+            KeyCode.KScrolllock,
+            KeyCode.KPrintscreen,
+            KeyCode.KPause,
+            KeyCode.KNumlockclear,
+            KeyCode.KClear,
+            KeyCode.KKP0,
+            KeyCode.KKP1,
+            KeyCode.KKP2,
+            KeyCode.KKP3,
+            KeyCode.KKP4,
+            KeyCode.KKP5,
+            KeyCode.KKP6,
+            KeyCode.KKP7,
+            KeyCode.KKP8,
+            KeyCode.KKP9,
+            KeyCode.KKPDivide,
+            KeyCode.KKPMultiply,
+            KeyCode.KKPMinus,
+            KeyCode.KKPPlus,
+            KeyCode.KKPDecimal,
+            KeyCode.KKPEnter,
+            KeyCode.KA,
+            KeyCode.KB,
+            KeyCode.KC,
+            KeyCode.KD,
+            KeyCode.KE,
+            KeyCode.KF,
+            KeyCode.KG,
+            KeyCode.KH,
+            KeyCode.KI,
+            KeyCode.KJ,
+            KeyCode.KK,
+            KeyCode.KL,
+            KeyCode.KM,
+            KeyCode.KN,
+            KeyCode.KO,
+            KeyCode.KP,
+            KeyCode.KQ,
+            KeyCode.KR,
+            KeyCode.KS,
+            KeyCode.KT,
+            KeyCode.KU,
+            KeyCode.KV,
+            KeyCode.KW,
+            KeyCode.KX,
+            KeyCode.KY,
+            KeyCode.KZ,
+            KeyCode.K0,
+            KeyCode.K1,
+            KeyCode.K2,
+            KeyCode.K3,
+            KeyCode.K4,
+            KeyCode.K5,
+            KeyCode.K6,
+            KeyCode.K7,
+            KeyCode.K8,
+            KeyCode.K9,
+            KeyCode.KBackquote,
+            KeyCode.KBackquote,
+            KeyCode.KMinus,
+            KeyCode.KPlus,
+            KeyCode.KLeftbracket,
+            KeyCode.KRightbracket,
+            KeyCode.KSemicolon,
+            KeyCode.KQuote,
+            KeyCode.KComma,
+            KeyCode.KPeriod,
+            KeyCode.KSlash,
+            KeyCode.KBackslash,
 
             // Invalids
-            SDL_Keycode.SDLK_0,
+            KeyCode.K0,
         };
 
         public SDL2Keyboard(SDL2KeyboardDriver driver, string id, string name)
@@ -205,36 +207,37 @@ namespace Ryujinx.Input.SDL2
                 return -1;
             }
 
-            return (int)SDL_GetScancodeFromKey(_keysDriverMapping[(int)key]);
+            return (int)_sdl.GetScancodeFromKey((int)_keysDriverMapping[(int)key]);
         }
 
-        private static SDL_Keymod GetKeyboardModifierMask(Key key)
+        private static Keymod GetKeyboardModifierMask(Key key)
         {
             return key switch
             {
-                Key.ShiftLeft => SDL_Keymod.KMOD_LSHIFT,
-                Key.ShiftRight => SDL_Keymod.KMOD_RSHIFT,
-                Key.ControlLeft => SDL_Keymod.KMOD_LCTRL,
-                Key.ControlRight => SDL_Keymod.KMOD_RCTRL,
-                Key.AltLeft => SDL_Keymod.KMOD_LALT,
-                Key.AltRight => SDL_Keymod.KMOD_RALT,
-                Key.WinLeft => SDL_Keymod.KMOD_LGUI,
-                Key.WinRight => SDL_Keymod.KMOD_RGUI,
+                Key.ShiftLeft => Keymod.Lshift,
+                Key.ShiftRight => Keymod.Rshift,
+                Key.ControlLeft => Keymod.Lctrl,
+                Key.ControlRight => Keymod.Rctrl,
+                Key.AltLeft => Keymod.Lalt,
+                Key.AltRight => Keymod.Ralt,
+                Key.WinLeft => Keymod.Lgui,
+                Key.WinRight => Keymod.Rgui,
                 // NOTE: Menu key isn't supported by SDL2.
-                _ => SDL_Keymod.KMOD_NONE,
+                _ => Keymod.None,
             };
         }
 
         public KeyboardStateSnapshot GetKeyboardStateSnapshot()
         {
             ReadOnlySpan<byte> rawKeyboardState;
-            SDL_Keymod rawKeyboardModifierState = SDL_GetModState();
+            Keymod rawKeyboardModifierState = _sdl.GetModState();
 
             unsafe
             {
-                IntPtr statePtr = SDL_GetKeyboardState(out int numKeys);
+                int numKeys = new int();
+                byte* statePtr = _sdl.GetKeyboardState(ref numKeys);
 
-                rawKeyboardState = new ReadOnlySpan<byte>((byte*)statePtr, numKeys);
+                rawKeyboardState = new ReadOnlySpan<byte>(statePtr, numKeys);
             }
 
             bool[] keysState = new bool[(int)Key.Count];
@@ -244,9 +247,9 @@ namespace Ryujinx.Input.SDL2
                 int index = ToSDL2Scancode(key);
                 if (index == -1)
                 {
-                    SDL_Keymod modifierMask = GetKeyboardModifierMask(key);
+                    Keymod modifierMask = GetKeyboardModifierMask(key);
 
-                    if (modifierMask == SDL_Keymod.KMOD_NONE)
+                    if (modifierMask == Keymod.None)
                     {
                         continue;
                     }

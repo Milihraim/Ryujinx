@@ -5,11 +5,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Ryujinx.SDL2-CS" />
+    <ProjectReference Include="..\Ryujinx.Common\Ryujinx.Common.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Ryujinx.Common\Ryujinx.Common.csproj" />
+    <PackageReference Include="Silk.NET.Input.Sdl" />
+    <PackageReference Include="Silk.NET.SDL" />
+    <PackageReference Include="Silk.NET.Windowing.Sdl" />
   </ItemGroup>
 
 </Project>

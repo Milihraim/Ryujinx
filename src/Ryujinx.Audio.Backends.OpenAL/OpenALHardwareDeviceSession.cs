@@ -1,7 +1,9 @@
-using OpenTK.Audio.OpenAL;
 using Ryujinx.Audio.Backends.Common;
 using Ryujinx.Audio.Common;
 using Ryujinx.Memory;
+using Silk.NET.OpenAL;
+using Silk.NET.OpenAL.Extensions.EXT;
+using Silk.NET.OpenAL.Extensions.EXT.Enums;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -11,11 +13,12 @@ namespace Ryujinx.Audio.Backends.OpenAL
     class OpenALHardwareDeviceSession : HardwareDeviceSessionOutputBase
     {
         private readonly OpenALHardwareDeviceDriver _driver;
-        private readonly int _sourceId;
-        private readonly ALFormat _targetFormat;
+        private readonly BufferFormat _targetFormat;
         private bool _isActive;
+        private AL _al;
         private readonly Queue<OpenALAudioBuffer> _queuedBuffers;
         private ulong _playedSampleCount;
+        private UInt32 sourceId;
 
         private readonly object _lock = new();
 
@@ -23,22 +26,23 @@ namespace Ryujinx.Audio.Backends.OpenAL
         {
             _driver = driver;
             _queuedBuffers = new Queue<OpenALAudioBuffer>();
-            _sourceId = AL.GenSource();
+            _al = AL.GetApi();
+            sourceId = _al.GenSource();
             _targetFormat = GetALFormat();
             _isActive = false;
             _playedSampleCount = 0;
             SetVolume(requestedVolume);
         }
 
-        private ALFormat GetALFormat()
+        private BufferFormat GetALFormat()
         {
             return RequestedSampleFormat switch
             {
                 SampleFormat.PcmInt16 => RequestedChannelCount switch
                 {
-                    1 => ALFormat.Mono16,
-                    2 => ALFormat.Stereo16,
-                    6 => ALFormat.Multi51Chn16Ext,
+                    1 => BufferFormat.Mono16,
+                    2 => BufferFormat.Stereo16,
+                    6 => (BufferFormat)MCBufferFormat.S51Chn16,
                     _ => throw new NotImplementedException($"Unsupported channel config {RequestedChannelCount}"),
                 },
                 _ => throw new NotImplementedException($"Unsupported sample format {RequestedSampleFormat}"),
@@ -49,32 +53,37 @@ namespace Ryujinx.Audio.Backends.OpenAL
 
         private void StartIfNotPlaying()
         {
-            AL.GetSource(_sourceId, ALGetSourcei.SourceState, out int stateInt);
+            _al.GetSourceProperty(sourceId, GetSourceInteger.SourceState, out int stateInt);
 
-            ALSourceState State = (ALSourceState)stateInt;
+            SourceState State = (SourceState)stateInt;
 
-            if (State != ALSourceState.Playing)
+            if (State != SourceState.Playing)
             {
-                AL.SourcePlay(_sourceId);
+                _al.SourcePlay(sourceId);
             }
         }
 
-        public override void QueueBuffer(AudioBuffer buffer)
+        public override unsafe void QueueBuffer(AudioBuffer buffer)
         {
             lock (_lock)
             {
                 OpenALAudioBuffer driverBuffer = new()
                 {
                     DriverIdentifier = buffer.DataPointer,
-                    BufferId = AL.GenBuffer(),
+                    BufferId = _al.GenBuffer(),
                     SampleCount = GetSampleCount(buffer),
                 };
 
-                AL.BufferData(driverBuffer.BufferId, _targetFormat, buffer.Data, (int)RequestedSampleRate);
+                _al.BufferData(driverBuffer.BufferId, _targetFormat, buffer.Data, (int)RequestedSampleRate);
 
                 _queuedBuffers.Enqueue(driverBuffer);
 
-                AL.SourceQueueBuffer(_sourceId, driverBuffer.BufferId);
+                // Use fixed statement to pin bufferIds array and obtain a pointer
+                uint[] bufferIds = new uint[] { driverBuffer.BufferId };
+                fixed (uint* bufferIdsPtr = bufferIds)
+                {
+                    _al.SourceQueueBuffers(sourceId, 1, bufferIdsPtr);
+                }
 
                 if (_isActive)
                 {
@@ -87,13 +96,13 @@ namespace Ryujinx.Audio.Backends.OpenAL
         {
             lock (_lock)
             {
-                AL.Source(_sourceId, ALSourcef.Gain, volume);
+                _al.SetSourceProperty(sourceId, SourceFloat.Gain, volume);
             }
         }
 
         public override float GetVolume()
         {
-            AL.GetSource(_sourceId, ALSourcef.Gain, out float volume);
+            _al.GetSourceProperty(sourceId, SourceFloat.Gain, out float volume);
 
             return volume;
         }
@@ -114,7 +123,7 @@ namespace Ryujinx.Audio.Backends.OpenAL
             {
                 SetVolume(0.0f);
 
-                AL.SourceStop(_sourceId);
+                _al.SourceStop(sourceId);
 
                 _isActive = false;
             }
@@ -143,19 +152,23 @@ namespace Ryujinx.Audio.Backends.OpenAL
             }
         }
 
-        public bool Update()
+        public unsafe bool Update()
         {
             lock (_lock)
             {
                 if (_isActive)
                 {
-                    AL.GetSource(_sourceId, ALGetSourcei.BuffersProcessed, out int releasedCount);
+                    _al.GetSourceProperty(sourceId, GetSourceInteger.BuffersProcessed, out int releasedCount);
 
                     if (releasedCount > 0)
                     {
-                        int[] bufferIds = new int[releasedCount];
+                        uint[] bufferIds = new uint[releasedCount];
 
-                        AL.SourceUnqueueBuffers(_sourceId, releasedCount, bufferIds);
+                        // Pin bufferIds array in memory and get a pointer to it
+                        fixed (uint* bufferIdsPtr = bufferIds)
+                        {
+                            _al.SourceUnqueueBuffers(sourceId, releasedCount, bufferIdsPtr);
+                        }
 
                         int i = 0;
 
@@ -173,7 +186,7 @@ namespace Ryujinx.Audio.Backends.OpenAL
 
                         Debug.Assert(i == bufferIds.Length, "Unknown buffer ids found!");
 
-                        AL.DeleteBuffers(bufferIds);
+                        _al.DeleteBuffers(bufferIds);
                     }
 
                     return releasedCount > 0;
@@ -192,7 +205,7 @@ namespace Ryujinx.Audio.Backends.OpenAL
                     PrepareToClose();
                     Stop();
 
-                    AL.DeleteSource(_sourceId);
+                    _al.DeleteSource(sourceId);
                 }
             }
         }

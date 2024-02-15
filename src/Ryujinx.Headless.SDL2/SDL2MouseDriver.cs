@@ -1,12 +1,12 @@
 using Ryujinx.Common.Configuration;
 using Ryujinx.Common.Logging;
 using Ryujinx.Input;
+using Silk.NET.SDL;
 using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using static SDL2.SDL;
 
 namespace Ryujinx.Headless.SDL2
 {
@@ -18,6 +18,7 @@ namespace Ryujinx.Headless.SDL2
         private readonly HideCursorMode _hideCursorMode;
         private bool _isHidden;
         private long _lastCursorMoveTime;
+        private Sdl _sdl = Sdl.GetApi();
 
         public bool[] PressedButtons { get; }
 
@@ -32,7 +33,7 @@ namespace Ryujinx.Headless.SDL2
 
             if (_hideCursorMode == HideCursorMode.Always)
             {
-                if (SDL_ShowCursor(SDL_DISABLE) != SDL_DISABLE)
+                if (_sdl.ShowCursor(Sdl.Disable) != Sdl.Disable)
                 {
                     Logger.Error?.PrintMsg(LogClass.Application, "Failed to disable the cursor.");
                 }
@@ -51,7 +52,9 @@ namespace Ryujinx.Headless.SDL2
 
         public void UpdatePosition()
         {
-            _ = SDL_GetMouseState(out int posX, out int posY);
+            int posX = 0;
+            int posY = 0;
+            _ = _sdl.GetMouseState(ref posX, ref posY);
             Vector2 position = new(posX, posY);
 
             if (CurrentPosition != position)
@@ -76,7 +79,7 @@ namespace Ryujinx.Headless.SDL2
             {
                 if (!_isHidden)
                 {
-                    if (SDL_ShowCursor(SDL_DISABLE) != SDL_DISABLE)
+                    if (_sdl.ShowCursor(Sdl.Disable) != Sdl.Disable)
                     {
                         Logger.Error?.PrintMsg(LogClass.Application, "Failed to disable the cursor.");
                     }
@@ -88,7 +91,7 @@ namespace Ryujinx.Headless.SDL2
             {
                 if (_isHidden)
                 {
-                    if (SDL_ShowCursor(SDL_ENABLE) != SDL_ENABLE)
+                    if (_sdl.ShowCursor(Sdl.Enable) != Sdl.Enable)
                     {
                         Logger.Error?.PrintMsg(LogClass.Application, "Failed to enable the cursor.");
                     }
@@ -98,32 +101,32 @@ namespace Ryujinx.Headless.SDL2
             }
         }
 
-        public void Update(SDL_Event evnt)
+        public void Update(Event evnt)
         {
-            switch (evnt.type)
+            switch (evnt.Type)
             {
-                case SDL_EventType.SDL_MOUSEBUTTONDOWN:
-                case SDL_EventType.SDL_MOUSEBUTTONUP:
-                    uint rawButton = evnt.button.button;
+                case (uint)EventType.Mousebuttondown:
+                case (uint)EventType.Mousebuttonup:
+                    uint rawButton = evnt.Button.Button;
 
                     if (rawButton > 0 && rawButton <= (int)MouseButton.Count)
                     {
-                        PressedButtons[(int)DriverButtonToMouseButton(rawButton)] = evnt.type == SDL_EventType.SDL_MOUSEBUTTONDOWN;
+                        PressedButtons[(int)DriverButtonToMouseButton(rawButton)] = evnt.Type == (UIntPtr)EventType.Mousebuttondown;
 
-                        CurrentPosition = new Vector2(evnt.button.x, evnt.button.y);
+                        CurrentPosition = new Vector2(evnt.Button.X, evnt.Button.Y);
                     }
 
                     break;
 
                 // NOTE: On Linux using Wayland mouse motion events won't be received at all.
-                case SDL_EventType.SDL_MOUSEMOTION:
-                    CurrentPosition = new Vector2(evnt.motion.x, evnt.motion.y);
+                case (uint)EventType.Mousemotion:
+                    CurrentPosition = new Vector2(evnt.Motion.X, evnt.Motion.Y);
                     _lastCursorMoveTime = Stopwatch.GetTimestamp();
 
                     break;
 
-                case SDL_EventType.SDL_MOUSEWHEEL:
-                    Scroll = new Vector2(evnt.wheel.x, evnt.wheel.y);
+                case (uint)EventType.Mousewheel:
+                    Scroll = new Vector2(evnt.Wheel.X, evnt.Wheel.Y);
 
                     break;
             }

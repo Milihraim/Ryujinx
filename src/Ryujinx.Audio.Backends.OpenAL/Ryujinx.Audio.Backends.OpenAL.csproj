@@ -2,14 +2,18 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="OpenTK.Audio.OpenAL" />
+    <ProjectReference Include="..\Ryujinx.Audio\Ryujinx.Audio.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Ryujinx.Audio\Ryujinx.Audio.csproj" />
+    <PackageReference Include="Silk.NET.OpenAL" />
+    <PackageReference Include="Silk.NET.OpenAL.Extensions.Creative" />
+    <PackageReference Include="Silk.NET.OpenAL.Extensions.Enumeration" />
+    <PackageReference Include="Silk.NET.OpenAL.Extensions.EXT" />
   </ItemGroup>
 
 </Project>

@@ -2,15 +2,19 @@ using Ryujinx.Common.Configuration;
 using Ryujinx.Common.Logging;
 using Ryujinx.Input.HLE;
 using Ryujinx.SDL2.Common;
+using Silk.NET.Core.Native;
+using Silk.NET.SDL;
+using Silk.NET.Vulkan;
 using System;
 using System.Runtime.InteropServices;
-using static SDL2.SDL;
+using VkHandle = Silk.NET.Core.Native.VkHandle;
 
 namespace Ryujinx.Headless.SDL2.Vulkan
 {
     class VulkanWindow : WindowBase
     {
         private readonly GraphicsDebugLevel _glLogLevel;
+        private Sdl _sdl = Sdl.GetApi();
 
         public VulkanWindow(
             InputManager inputManager,
@@ -23,7 +27,7 @@ namespace Ryujinx.Headless.SDL2.Vulkan
             _glLogLevel = glLogLevel;
         }
 
-        public override SDL_WindowFlags GetWindowFlags() => SDL_WindowFlags.SDL_WINDOW_VULKAN;
+        public override WindowFlags GetWindowFlags() => WindowFlags.Vulkan;
 
         protected override void InitializeWindowRenderer() { }
 
@@ -46,15 +50,15 @@ namespace Ryujinx.Headless.SDL2.Vulkan
             action();
         }
 
-        public IntPtr CreateWindowSurface(IntPtr instance)
+        public unsafe ulong? CreateWindowSurface(IntPtr instance)
         {
-            ulong surfaceHandle = 0;
+            VkNonDispatchableHandle surfaceHandle = new VkNonDispatchableHandle();
 
             void CreateSurface()
             {
-                if (SDL_Vulkan_CreateSurface(WindowHandle, instance, out surfaceHandle) == SDL_bool.SDL_FALSE)
+                if (_sdl.VulkanCreateSurface(WindowHandle, new VkHandle(instance), ref surfaceHandle) == SdlBool.False)
                 {
-                    string errorMessage = $"SDL_Vulkan_CreateSurface failed with error \"{SDL_GetError()}\"";
+                    string errorMessage = $"SDL_Vulkan_CreateSurface failed with error \"{_sdl.GetErrorS()}\"";
 
                     Logger.Error?.Print(LogClass.Application, errorMessage);
 
@@ -71,19 +75,20 @@ namespace Ryujinx.Headless.SDL2.Vulkan
                 CreateSurface();
             }
 
-            return (IntPtr)surfaceHandle;
+            return surfaceHandle.Handle;
         }
 
         public unsafe string[] GetRequiredInstanceExtensions()
         {
-            if (SDL_Vulkan_GetInstanceExtensions(WindowHandle, out uint extensionsCount, IntPtr.Zero) == SDL_bool.SDL_TRUE)
+            uint extensionsCount = new uint();
+            if (_sdl.VulkanGetInstanceExtensions(WindowHandle, ref extensionsCount, (byte**)IntPtr.Zero) == SdlBool.True)
             {
                 IntPtr[] rawExtensions = new IntPtr[(int)extensionsCount];
                 string[] extensions = new string[(int)extensionsCount];
 
                 fixed (IntPtr* rawExtensionsPtr = rawExtensions)
                 {
-                    if (SDL_Vulkan_GetInstanceExtensions(WindowHandle, out extensionsCount, (IntPtr)rawExtensionsPtr) == SDL_bool.SDL_TRUE)
+                    if (_sdl.VulkanGetInstanceExtensions(WindowHandle, ref extensionsCount, (byte**)rawExtensionsPtr) == SdlBool.True)
                     {
                         for (int i = 0; i < extensions.Length; i++)
                         {
@@ -95,7 +100,7 @@ namespace Ryujinx.Headless.SDL2.Vulkan
                 }
             }
 
-            string errorMessage = $"SDL_Vulkan_GetInstanceExtensions failed with error \"{SDL_GetError()}\"";
+            string errorMessage = $"SDL_Vulkan_GetInstanceExtensions failed with error \"{_sdl.GetErrorS()}\"";
 
             Logger.Error?.Print(LogClass.Application, errorMessage);
 
