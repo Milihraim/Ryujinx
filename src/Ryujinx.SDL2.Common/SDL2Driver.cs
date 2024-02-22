@@ -23,7 +23,7 @@ namespace Ryujinx.SDL2.Common
             }
         }
 
-        public static Action<Action> MainThreadDispatcher { get; set; }
+        //public static Action<Action> MainThreadDispatcher { get; set; }
 
         private const uint SdlInitFlags = SDL_INIT_EVENTS | SDL_INIT_GAMECONTROLLER | SDL_INIT_JOYSTICK | SDL_INIT_AUDIO | SDL_INIT_VIDEO;
 
@@ -102,9 +102,9 @@ namespace Ryujinx.SDL2.Common
                 }
 
                 _registeredWindowHandlers = new ConcurrentDictionary<uint, Action<SDL_Event>>();
-                _worker = new Thread(EventWorker);
+                //_worker = new Thread(EventWorker);
                 _isRunning = true;
-                _worker.Start();
+                //_worker.Start();
             }
         }
 
@@ -151,23 +151,12 @@ namespace Ryujinx.SDL2.Common
             }
         }
 
-        private void EventWorker()
+        public void PollEvents()
         {
-            const int WaitTimeMs = 10;
-
-            using ManualResetEventSlim waitHandle = new(false);
-
-            while (_isRunning)
+            //SDL_PollEvent evnt = new SDL_PollEvent();
+            while (SDL_PollEvent(out SDL_Event evnt) != 0)
             {
-                MainThreadDispatcher?.Invoke(() =>
-                {
-                    while (SDL_PollEvent(out SDL_Event evnt) != 0)
-                    {
-                        HandleSDLEvent(ref evnt);
-                    }
-                });
-
-                waitHandle.Wait(WaitTimeMs);
+                HandleSDLEvent(ref evnt);
             }
         }
 

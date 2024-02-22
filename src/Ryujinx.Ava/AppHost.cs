@@ -34,6 +34,7 @@ using Ryujinx.HLE.HOS.Services.Account.Acc;
 using Ryujinx.HLE.HOS.SystemState;
 using Ryujinx.Input;
 using Ryujinx.Input.HLE;
+using Ryujinx.SDL2.Common;
 using Ryujinx.UI.App.Common;
 using Ryujinx.UI.Common;
 using Ryujinx.UI.Common.Configuration;
@@ -876,6 +877,18 @@ namespace Ryujinx.Ava
             }
         }
 
+        private void PollSdlEvents()
+        {
+            if (OperatingSystem.IsMacOS())
+            {
+                Dispatcher.UIThread.InvokeAsync(() => SDL2Driver.Instance.PollEvents(), DispatcherPriority.Input);
+            }
+            else
+            {
+                SDL2Driver.Instance.PollEvents();
+            }
+        }
+
         private void RenderLoop()
         {
             Dispatcher.UIThread.InvokeAsync(() =>
@@ -920,6 +933,7 @@ namespace Ryujinx.Ava
 
                 while (_isActive)
                 {
+                    PollSdlEvents();
                     _ticks += _chrono.ElapsedTicks;
 
                     _chrono.Restart();

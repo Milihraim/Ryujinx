@@ -97,7 +97,7 @@ namespace Ryujinx.Ava
             DiscordIntegrationModule.Initialize();
 
             // Initialize SDL2 driver
-            SDL2Driver.MainThreadDispatcher = action => Dispatcher.UIThread.InvokeAsync(action, DispatcherPriority.Input);
+            //SDL2Driver.MainThreadDispatcher = action => Dispatcher.UIThread.InvokeAsync(action, DispatcherPriority.Input);
 
             ReloadConfig();
 
