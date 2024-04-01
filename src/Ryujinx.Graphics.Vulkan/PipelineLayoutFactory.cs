@@ -78,7 +78,7 @@ namespace Ryujinx.Graphics.Vulkan
                     SType = StructureType.PipelineLayoutCreateInfo,
                     PSetLayouts = pLayouts,
                     SetLayoutCount = (uint)layouts.Length,
-                    Flags = PipelineLayoutCreateFlags.IndependentSetsBitExt,
+                    //Flags = PipelineLayoutCreateFlags.IndependentSetsBitExt,
                 };
 
                 gd.Api.CreatePipelineLayout(device, &pipelineLayoutCreateInfo, null, out pipelineLayout).ThrowOnError();
