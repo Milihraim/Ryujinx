@@ -42,6 +42,8 @@ namespace Ryujinx.Graphics.Vulkan
             "VK_EXT_depth_clip_control",
             "VK_KHR_portability_subset", // As per spec, we should enable this if present.
             "VK_EXT_4444_formats",
+            "VK_EXT_graphics_pipeline_library",
+            "VK_KHR_pipeline_library",
         };
 
         private static readonly string[] _requiredExtensions = {
@@ -305,6 +307,15 @@ namespace Ryujinx.Graphics.Vulkan
                 PNext = features2.PNext,
             };
 
+            PhysicalDeviceGraphicsPipelineLibraryFeaturesEXT gplfeatures = new()
+            {
+                SType = StructureType.PhysicalDeviceGraphicsPipelineLibraryFeaturesExt,
+                PNext = features2.PNext,
+                GraphicsPipelineLibrary = Vk.True,
+            };
+
+            features2.PNext = &gplfeatures;
+
             if (physicalDevice.IsDeviceExtensionPresent("VK_EXT_custom_border_color"))
             {
                 features2.PNext = &supportedFeaturesCustomBorderColor;
@@ -382,6 +393,7 @@ namespace Ryujinx.Graphics.Vulkan
                 TessellationShader = supportedFeatures.TessellationShader,
                 VertexPipelineStoresAndAtomics = supportedFeatures.VertexPipelineStoresAndAtomics,
                 RobustBufferAccess = useRobustBufferAccess,
+                SampleRateShading = Vk.True,
             };
 
             void* pExtendedFeatures = null;
@@ -454,6 +466,8 @@ namespace Ryujinx.Graphics.Vulkan
                 DescriptorIndexing = physicalDevice.IsDeviceExtensionPresent("VK_EXT_descriptor_indexing"),
                 DrawIndirectCount = physicalDevice.IsDeviceExtensionPresent(KhrDrawIndirectCount.ExtensionName),
                 UniformBufferStandardLayout = physicalDevice.IsDeviceExtensionPresent("VK_KHR_uniform_buffer_standard_layout"),
+                UniformAndStorageBuffer8BitAccess = Vk.True,
+                StorageBuffer8BitAccess = Vk.True,
             };
 
             pExtendedFeatures = &featuresVk12;
@@ -517,6 +531,15 @@ namespace Ryujinx.Graphics.Vulkan
 
                 pExtendedFeatures = &featuresDepthClipControl;
             }
+
+            var gpl = new PhysicalDeviceGraphicsPipelineLibraryFeaturesEXT
+            {
+                SType = StructureType.PhysicalDeviceGraphicsPipelineLibraryFeaturesExt,
+                PNext = pExtendedFeatures,
+                GraphicsPipelineLibrary = Vk.True,
+            };
+            
+            pExtendedFeatures = &gpl;
 
             var enabledExtensions = _requiredExtensions.Union(_desirableExtensions.Intersect(physicalDevice.DeviceExtensions)).ToArray();
 

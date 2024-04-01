@@ -381,11 +381,21 @@ namespace Ryujinx.Graphics.Vulkan
             return pipeline;
         }
 
+        private Auto<DisposablePipeline> pipelinelib1;
+        private Auto<DisposablePipeline> pipelinelib2;
+        private Auto<DisposablePipeline> pipelinelib3;
+        private Auto<DisposablePipeline> pipelinelib4;
+
+        
         public unsafe Auto<DisposablePipeline> CreateGraphicsPipeline(
             VulkanRenderer gd,
             Device device,
             ShaderCollection program,
             PipelineCache cache,
+            PipelineCache vertexCache,
+            PipelineCache prerasterCache,
+            PipelineCache fragShadCache,
+            PipelineCache fragOutCache,
             RenderPass renderPass,
             bool throwOnError = false)
         {
@@ -395,7 +405,9 @@ namespace Ryujinx.Graphics.Vulkan
             }
 
             Pipeline pipelineHandle = default;
-
+            
+            PipelineLibraryCreateInfoKHR pipelinelibrary;
+            
             bool isMoltenVk = gd.IsMoltenVk;
 
             if (isMoltenVk)
@@ -410,214 +422,50 @@ namespace Ryujinx.Graphics.Vulkan
             fixed (Rect2D* pScissors = &Internal.Scissors[0])
             fixed (PipelineColorBlendAttachmentState* pColorBlendAttachmentState = &Internal.ColorBlendAttachmentState[0])
             {
-                var vertexInputState = new PipelineVertexInputStateCreateInfo
+                
+                if (!RasterizerDiscardEnable)
                 {
-                    SType = StructureType.PipelineVertexInputStateCreateInfo,
-                    VertexAttributeDescriptionCount = VertexAttributeDescriptionsCount,
-                    PVertexAttributeDescriptions = isMoltenVk ? pVertexAttributeDescriptions2 : pVertexAttributeDescriptions,
-                    VertexBindingDescriptionCount = VertexBindingDescriptionsCount,
-                    PVertexBindingDescriptions = pVertexBindingDescriptions,
-                };
+                    Pipeline* pipelineLibraries = stackalloc Pipeline[4];
 
-                bool primitiveRestartEnable = PrimitiveRestartEnable;
+                    PipelineVertexInputStateCreateInfo(pipelineLibraries, device, gd, renderPass, isMoltenVk,
+                        pVertexAttributeDescriptions2, pVertexAttributeDescriptions, pVertexBindingDescriptions, vertexCache);
 
-                bool topologySupportsRestart;
+                    PipelinePreRasterCreateInfo(pipelineLibraries, device, gd, renderPass, pViewports, pScissors, prerasterCache);
 
-                if (gd.Capabilities.SupportsPrimitiveTopologyListRestart)
-                {
-                    topologySupportsRestart = gd.Capabilities.SupportsPrimitiveTopologyPatchListRestart || Topology != PrimitiveTopology.PatchList;
+                    PipelineFragmentShaderCreateInfo(pipelineLibraries, device, gd, renderPass, fragShadCache);
+
+                    FragmentOutputCreateInfo(pipelineLibraries, device, gd, renderPass, pColorBlendAttachmentState, fragOutCache);
+                    
+                    pipelinelibrary = new PipelineLibraryCreateInfoKHR
+                    {
+                        SType = StructureType.PipelineLibraryCreateInfoKhr,
+                        LibraryCount = 4,
+                        PLibraries = pipelineLibraries,
+                    };
                 }
                 else
                 {
-                    topologySupportsRestart = Topology == PrimitiveTopology.LineStrip ||
-                                              Topology == PrimitiveTopology.TriangleStrip ||
-                                              Topology == PrimitiveTopology.TriangleFan ||
-                                              Topology == PrimitiveTopology.LineStripWithAdjacency ||
-                                              Topology == PrimitiveTopology.TriangleStripWithAdjacency;
-                }
+                    Pipeline* pipelineLibraries = stackalloc Pipeline[2];
 
-                primitiveRestartEnable &= topologySupportsRestart;
+                    PipelineVertexInputStateCreateInfo(pipelineLibraries, device, gd, renderPass, isMoltenVk,
+                        pVertexAttributeDescriptions2, pVertexAttributeDescriptions, pVertexBindingDescriptions, vertexCache);
 
-                var inputAssemblyState = new PipelineInputAssemblyStateCreateInfo
-                {
-                    SType = StructureType.PipelineInputAssemblyStateCreateInfo,
-                    PrimitiveRestartEnable = primitiveRestartEnable,
-                    Topology = Topology,
-                };
-
-                var tessellationState = new PipelineTessellationStateCreateInfo
-                {
-                    SType = StructureType.PipelineTessellationStateCreateInfo,
-                    PatchControlPoints = PatchControlPoints,
-                };
-
-                var rasterizationState = new PipelineRasterizationStateCreateInfo
-                {
-                    SType = StructureType.PipelineRasterizationStateCreateInfo,
-                    DepthClampEnable = DepthClampEnable,
-                    RasterizerDiscardEnable = RasterizerDiscardEnable,
-                    PolygonMode = PolygonMode,
-                    LineWidth = LineWidth,
-                    CullMode = CullMode,
-                    FrontFace = FrontFace,
-                    DepthBiasEnable = DepthBiasEnable,
-                    DepthBiasClamp = DepthBiasClamp,
-                    DepthBiasConstantFactor = DepthBiasConstantFactor,
-                    DepthBiasSlopeFactor = DepthBiasSlopeFactor,
-                };
-
-                var viewportState = new PipelineViewportStateCreateInfo
-                {
-                    SType = StructureType.PipelineViewportStateCreateInfo,
-                    ViewportCount = ViewportsCount,
-                    PViewports = pViewports,
-                    ScissorCount = ScissorsCount,
-                    PScissors = pScissors,
-                };
-
-                if (gd.Capabilities.SupportsDepthClipControl)
-                {
-                    var viewportDepthClipControlState = new PipelineViewportDepthClipControlCreateInfoEXT
+                    PipelinePreRasterCreateInfo(pipelineLibraries, device, gd, renderPass, pViewports, pScissors, prerasterCache);
+                    
+                    pipelinelibrary = new PipelineLibraryCreateInfoKHR
                     {
-                        SType = StructureType.PipelineViewportDepthClipControlCreateInfoExt,
-                        NegativeOneToOne = DepthMode,
+                        SType = StructureType.PipelineLibraryCreateInfoKhr,
+                        LibraryCount = 2,
+                        PLibraries = pipelineLibraries,
                     };
-
-                    viewportState.PNext = &viewportDepthClipControlState;
                 }
-
-                var multisampleState = new PipelineMultisampleStateCreateInfo
-                {
-                    SType = StructureType.PipelineMultisampleStateCreateInfo,
-                    SampleShadingEnable = false,
-                    RasterizationSamples = TextureStorage.ConvertToSampleCountFlags(gd.Capabilities.SupportedSampleCounts, SamplesCount),
-                    MinSampleShading = 1,
-                    AlphaToCoverageEnable = AlphaToCoverageEnable,
-                    AlphaToOneEnable = AlphaToOneEnable,
-                };
-
-                var stencilFront = new StencilOpState(
-                    StencilFrontFailOp,
-                    StencilFrontPassOp,
-                    StencilFrontDepthFailOp,
-                    StencilFrontCompareOp,
-                    StencilFrontCompareMask,
-                    StencilFrontWriteMask,
-                    StencilFrontReference);
-
-                var stencilBack = new StencilOpState(
-                    StencilBackFailOp,
-                    StencilBackPassOp,
-                    StencilBackDepthFailOp,
-                    StencilBackCompareOp,
-                    StencilBackCompareMask,
-                    StencilBackWriteMask,
-                    StencilBackReference);
-
-                var depthStencilState = new PipelineDepthStencilStateCreateInfo
-                {
-                    SType = StructureType.PipelineDepthStencilStateCreateInfo,
-                    DepthTestEnable = DepthTestEnable,
-                    DepthWriteEnable = DepthWriteEnable,
-                    DepthCompareOp = DepthCompareOp,
-                    DepthBoundsTestEnable = DepthBoundsTestEnable,
-                    StencilTestEnable = StencilTestEnable,
-                    Front = stencilFront,
-                    Back = stencilBack,
-                    MinDepthBounds = MinDepthBounds,
-                    MaxDepthBounds = MaxDepthBounds,
-                };
-
-                uint blendEnables = 0;
-
-                if (gd.IsMoltenVk && Internal.AttachmentIntegerFormatMask != 0)
-                {
-                    // Blend can't be enabled for integer formats, so let's make sure it is disabled.
-                    uint attachmentIntegerFormatMask = Internal.AttachmentIntegerFormatMask;
-
-                    while (attachmentIntegerFormatMask != 0)
-                    {
-                        int i = BitOperations.TrailingZeroCount(attachmentIntegerFormatMask);
-
-                        if (Internal.ColorBlendAttachmentState[i].BlendEnable)
-                        {
-                            blendEnables |= 1u << i;
-                        }
-
-                        Internal.ColorBlendAttachmentState[i].BlendEnable = false;
-                        attachmentIntegerFormatMask &= ~(1u << i);
-                    }
-                }
-
-                var colorBlendState = new PipelineColorBlendStateCreateInfo
-                {
-                    SType = StructureType.PipelineColorBlendStateCreateInfo,
-                    LogicOpEnable = LogicOpEnable,
-                    LogicOp = LogicOp,
-                    AttachmentCount = ColorBlendAttachmentStateCount,
-                    PAttachments = pColorBlendAttachmentState,
-                };
-
-                PipelineColorBlendAdvancedStateCreateInfoEXT colorBlendAdvancedState;
-
-                if (!AdvancedBlendSrcPreMultiplied ||
-                    !AdvancedBlendDstPreMultiplied ||
-                    AdvancedBlendOverlap != BlendOverlapEXT.UncorrelatedExt)
-                {
-                    colorBlendAdvancedState = new PipelineColorBlendAdvancedStateCreateInfoEXT
-                    {
-                        SType = StructureType.PipelineColorBlendAdvancedStateCreateInfoExt,
-                        SrcPremultiplied = AdvancedBlendSrcPreMultiplied,
-                        DstPremultiplied = AdvancedBlendDstPreMultiplied,
-                        BlendOverlap = AdvancedBlendOverlap,
-                    };
-
-                    colorBlendState.PNext = &colorBlendAdvancedState;
-                }
-
-                bool supportsExtDynamicState = gd.Capabilities.SupportsExtendedDynamicState;
-                int dynamicStatesCount = supportsExtDynamicState ? 9 : 8;
-
-                DynamicState* dynamicStates = stackalloc DynamicState[dynamicStatesCount];
-
-                dynamicStates[0] = DynamicState.Viewport;
-                dynamicStates[1] = DynamicState.Scissor;
-                dynamicStates[2] = DynamicState.DepthBias;
-                dynamicStates[3] = DynamicState.DepthBounds;
-                dynamicStates[4] = DynamicState.StencilCompareMask;
-                dynamicStates[5] = DynamicState.StencilWriteMask;
-                dynamicStates[6] = DynamicState.StencilReference;
-                dynamicStates[7] = DynamicState.BlendConstants;
-
-                if (supportsExtDynamicState)
-                {
-                    dynamicStates[8] = DynamicState.VertexInputBindingStrideExt;
-                }
-
-                var pipelineDynamicStateCreateInfo = new PipelineDynamicStateCreateInfo
-                {
-                    SType = StructureType.PipelineDynamicStateCreateInfo,
-                    DynamicStateCount = (uint)dynamicStatesCount,
-                    PDynamicStates = dynamicStates,
-                };
-
+                
                 var pipelineCreateInfo = new GraphicsPipelineCreateInfo
                 {
                     SType = StructureType.GraphicsPipelineCreateInfo,
-                    StageCount = StagesCount,
-                    PStages = Stages.Pointer,
-                    PVertexInputState = &vertexInputState,
-                    PInputAssemblyState = &inputAssemblyState,
-                    PTessellationState = &tessellationState,
-                    PViewportState = &viewportState,
-                    PRasterizationState = &rasterizationState,
-                    PMultisampleState = &multisampleState,
-                    PDepthStencilState = &depthStencilState,
-                    PColorBlendState = &colorBlendState,
-                    PDynamicState = &pipelineDynamicStateCreateInfo,
+                    PNext = &pipelinelibrary,
+                    Flags = PipelineCreateFlags.CreateLinkTimeOptimizationBitExt,
                     Layout = PipelineLayout,
-                    RenderPass = renderPass,
-                    BasePipelineIndex = -1,
                 };
 
                 Result result = gd.Api.CreateGraphicsPipelines(device, cache, 1, &pipelineCreateInfo, null, &pipelineHandle);
@@ -632,22 +480,376 @@ namespace Ryujinx.Graphics.Vulkan
 
                     return null;
                 }
-
-                // Restore previous blend enable values if we changed it.
-                while (blendEnables != 0)
-                {
-                    int i = BitOperations.TrailingZeroCount(blendEnables);
-
-                    Internal.ColorBlendAttachmentState[i].BlendEnable = true;
-                    blendEnables &= ~(1u << i);
-                }
             }
 
             pipeline = new Auto<DisposablePipeline>(new DisposablePipeline(gd.Api, device, pipelineHandle));
 
             program.AddGraphicsPipeline(ref Internal, pipeline);
+            program.AddGraphicsPipeline(ref Internal, pipelinelib1);
+            program.AddGraphicsPipeline(ref Internal, pipelinelib2);
+            program.AddGraphicsPipeline(ref Internal, pipelinelib3);
+            program.AddGraphicsPipeline(ref Internal, pipelinelib4);
+
 
             return pipeline;
+        }
+
+        private unsafe void FragmentOutputCreateInfo(Pipeline* pipelinesssss, Device device,
+            VulkanRenderer gd,
+            RenderPass renderPass,
+            PipelineColorBlendAttachmentState* pColorBlendAttachmentState, PipelineCache libraryCache)
+        {
+            uint blendEnables = 0;
+
+            if (gd.IsMoltenVk && Internal.AttachmentIntegerFormatMask != 0)
+            {
+                // Blend can't be enabled for integer formats, so let's make sure it is disabled.
+                uint attachmentIntegerFormatMask = Internal.AttachmentIntegerFormatMask;
+
+                while (attachmentIntegerFormatMask != 0)
+                {
+                    int i = BitOperations.TrailingZeroCount(attachmentIntegerFormatMask);
+
+                    if (Internal.ColorBlendAttachmentState[i].BlendEnable)
+                    {
+                        blendEnables |= 1u << i;
+                    }
+
+                    Internal.ColorBlendAttachmentState[i].BlendEnable = false;
+                    attachmentIntegerFormatMask &= ~(1u << i);
+                }
+            }
+
+            var colorBlendState = new PipelineColorBlendStateCreateInfo
+            {
+                SType = StructureType.PipelineColorBlendStateCreateInfo,
+                LogicOpEnable = LogicOpEnable,
+                LogicOp = LogicOp,
+                AttachmentCount = ColorBlendAttachmentStateCount,
+                PAttachments = pColorBlendAttachmentState,
+            };
+
+
+            if (!AdvancedBlendSrcPreMultiplied ||
+                !AdvancedBlendDstPreMultiplied ||
+                AdvancedBlendOverlap != BlendOverlapEXT.UncorrelatedExt)
+            {
+                
+                PipelineColorBlendAdvancedStateCreateInfoEXT colorBlendAdvancedState;
+
+                colorBlendAdvancedState = new PipelineColorBlendAdvancedStateCreateInfoEXT
+                {
+                    SType = StructureType.PipelineColorBlendAdvancedStateCreateInfoExt,
+                    SrcPremultiplied = AdvancedBlendSrcPreMultiplied,
+                    DstPremultiplied = AdvancedBlendDstPreMultiplied,
+                    BlendOverlap = AdvancedBlendOverlap,
+                };
+
+                colorBlendState.PNext = &colorBlendAdvancedState;
+            }
+
+            var library = new GraphicsPipelineLibraryCreateInfoEXT
+            {
+                SType = StructureType.GraphicsPipelineLibraryCreateInfoExt,
+                Flags = GraphicsPipelineLibraryFlagsEXT.FragmentOutputInterfaceBitExt,
+            };
+            
+            DynamicState* dynamicStates = stackalloc DynamicState[1];
+            dynamicStates[0] = DynamicState.BlendConstants;
+            
+            var pipelineDynamicStateCreateInfo = new PipelineDynamicStateCreateInfo
+            {
+                SType = StructureType.PipelineDynamicStateCreateInfo,
+                DynamicStateCount = 1,
+                PDynamicStates = dynamicStates,
+            };
+            
+            var multisampleState = new PipelineMultisampleStateCreateInfo
+            {
+                SType = StructureType.PipelineMultisampleStateCreateInfo,
+                SampleShadingEnable = false,
+                RasterizationSamples = TextureStorage.ConvertToSampleCountFlags(gd.Capabilities.SupportedSampleCounts, SamplesCount),
+                MinSampleShading = 1,
+                AlphaToCoverageEnable = AlphaToCoverageEnable,
+                AlphaToOneEnable = AlphaToOneEnable,
+            };
+            
+            var pipelineCreateInfo = new GraphicsPipelineCreateInfo
+            {
+                SType = StructureType.GraphicsPipelineCreateInfo,
+                Flags = PipelineCreateFlags.CreateLibraryBitKhr | PipelineCreateFlags.CreateRetainLinkTimeOptimizationInfoBitExt,
+                PNext = &library,
+                PColorBlendState = &colorBlendState,
+                RenderPass = renderPass,
+                PDynamicState = &pipelineDynamicStateCreateInfo,
+                PMultisampleState = &multisampleState,
+            };
+            
+            gd.Api.CreateGraphicsPipelines(device, libraryCache, 1, &pipelineCreateInfo, null, &pipelinesssss[3]);
+            
+            pipelinelib4 = new Auto<DisposablePipeline>(new DisposablePipeline(gd.Api, device, pipelinesssss[3]));
+
+            
+            // Restore previous blend enable values if we changed it.
+            while (blendEnables != 0)
+            {
+                int i = BitOperations.TrailingZeroCount(blendEnables);
+
+                Internal.ColorBlendAttachmentState[i].BlendEnable = true;
+                blendEnables &= ~(1u << i);
+            }
+        }
+
+        private unsafe void PipelineFragmentShaderCreateInfo(Pipeline* pipelinesssss, Device device,
+            VulkanRenderer gd,
+            RenderPass renderPass, PipelineCache libraryCache)
+        {
+            var multisampleState = new PipelineMultisampleStateCreateInfo
+            {
+                SType = StructureType.PipelineMultisampleStateCreateInfo,
+                SampleShadingEnable = false,
+                RasterizationSamples = TextureStorage.ConvertToSampleCountFlags(gd.Capabilities.SupportedSampleCounts, SamplesCount),
+                MinSampleShading = 1,
+                AlphaToCoverageEnable = AlphaToCoverageEnable,
+                AlphaToOneEnable = AlphaToOneEnable,
+            };
+
+            var stencilFront = new StencilOpState(
+                StencilFrontFailOp,
+                StencilFrontPassOp,
+                StencilFrontDepthFailOp,
+                StencilFrontCompareOp,
+                StencilFrontCompareMask,
+                StencilFrontWriteMask,
+                StencilFrontReference);
+
+            var stencilBack = new StencilOpState(
+                StencilBackFailOp,
+                StencilBackPassOp,
+                StencilBackDepthFailOp,
+                StencilBackCompareOp,
+                StencilBackCompareMask,
+                StencilBackWriteMask,
+                StencilBackReference);
+
+            var depthStencilState = new PipelineDepthStencilStateCreateInfo
+            {
+                SType = StructureType.PipelineDepthStencilStateCreateInfo,
+                DepthTestEnable = DepthTestEnable,
+                DepthWriteEnable = DepthWriteEnable,
+                DepthCompareOp = DepthCompareOp,
+                DepthBoundsTestEnable = DepthBoundsTestEnable,
+                StencilTestEnable = StencilTestEnable,
+                Front = stencilFront,
+                Back = stencilBack,
+                MinDepthBounds = MinDepthBounds,
+                MaxDepthBounds = MaxDepthBounds,
+            };
+
+            var library = new GraphicsPipelineLibraryCreateInfoEXT
+            {
+                SType = StructureType.GraphicsPipelineLibraryCreateInfoExt,
+                Flags = GraphicsPipelineLibraryFlagsEXT.FragmentShaderBitExt,
+            };
+            
+            DynamicState* dynamicStates = stackalloc DynamicState[4];
+            dynamicStates[0] = DynamicState.DepthBounds;
+            dynamicStates[1] = DynamicState.StencilCompareMask;
+            dynamicStates[2] = DynamicState.StencilWriteMask;
+            dynamicStates[3] = DynamicState.StencilReference;
+            
+            var pipelineDynamicStateCreateInfo = new PipelineDynamicStateCreateInfo
+            {
+                SType = StructureType.PipelineDynamicStateCreateInfo,
+                DynamicStateCount = 4,
+                PDynamicStates = dynamicStates,
+            };
+
+            
+            var pipelineCreateInfo = new GraphicsPipelineCreateInfo
+            {
+                SType = StructureType.GraphicsPipelineCreateInfo,
+                Flags = PipelineCreateFlags.CreateLibraryBitKhr | PipelineCreateFlags.CreateRetainLinkTimeOptimizationInfoBitExt,
+                PNext = &library,
+                StageCount = StagesCount,
+                PStages = Stages.Pointer,
+                PMultisampleState = &multisampleState,
+                PDepthStencilState = &depthStencilState,
+                Layout = PipelineLayout,
+                RenderPass = renderPass,
+                PDynamicState = &pipelineDynamicStateCreateInfo,
+            };
+            
+            gd.Api.CreateGraphicsPipelines(device, libraryCache, 1, &pipelineCreateInfo, null, &pipelinesssss[2]);
+            
+            pipelinelib3 = new Auto<DisposablePipeline>(new DisposablePipeline(gd.Api, device, pipelinesssss[2]));
+
+        }
+
+        private unsafe void PipelinePreRasterCreateInfo(Pipeline* pipelinesssss, Device device,
+            VulkanRenderer gd,
+            RenderPass renderPass,
+            Viewport* pViewports, Rect2D* pScissors, PipelineCache libraryCache)
+        {
+            var tessellationState = new PipelineTessellationStateCreateInfo
+            {
+                SType = StructureType.PipelineTessellationStateCreateInfo,
+                PatchControlPoints = PatchControlPoints,
+            };
+
+            var rasterizationState = new PipelineRasterizationStateCreateInfo
+            {
+                SType = StructureType.PipelineRasterizationStateCreateInfo,
+                DepthClampEnable = DepthClampEnable,
+                RasterizerDiscardEnable = RasterizerDiscardEnable,
+                PolygonMode = PolygonMode,
+                LineWidth = LineWidth,
+                CullMode = CullMode,
+                FrontFace = FrontFace,
+                DepthBiasEnable = DepthBiasEnable,
+                DepthBiasClamp = DepthBiasClamp,
+                DepthBiasConstantFactor = DepthBiasConstantFactor,
+                DepthBiasSlopeFactor = DepthBiasSlopeFactor,
+            };
+
+            var viewportState = new PipelineViewportStateCreateInfo
+            {
+                SType = StructureType.PipelineViewportStateCreateInfo,
+                ViewportCount = ViewportsCount,
+                PViewports = pViewports,
+                ScissorCount = ScissorsCount,
+                PScissors = pScissors,
+            };
+
+            if (gd.Capabilities.SupportsDepthClipControl)
+            {
+                var viewportDepthClipControlState = new PipelineViewportDepthClipControlCreateInfoEXT
+                {
+                    SType = StructureType.PipelineViewportDepthClipControlCreateInfoExt,
+                    NegativeOneToOne = DepthMode,
+                };
+
+                viewportState.PNext = &viewportDepthClipControlState;
+            }
+
+            var library = new GraphicsPipelineLibraryCreateInfoEXT
+            {
+                SType = StructureType.GraphicsPipelineLibraryCreateInfoExt,
+                Flags = GraphicsPipelineLibraryFlagsEXT.PreRasterizationShadersBitExt,
+            };
+            
+            DynamicState* dynamicStates = stackalloc DynamicState[3];
+            dynamicStates[0] = DynamicState.Viewport;
+            dynamicStates[1] = DynamicState.Scissor;
+            dynamicStates[2] = DynamicState.DepthBias;
+            
+            var pipelineDynamicStateCreateInfo = new PipelineDynamicStateCreateInfo
+            {
+                SType = StructureType.PipelineDynamicStateCreateInfo,
+                DynamicStateCount = 3,
+                PDynamicStates = dynamicStates,
+            };
+
+            
+            var pipelineCreateInfo = new GraphicsPipelineCreateInfo
+            {
+                SType = StructureType.GraphicsPipelineCreateInfo,
+                Flags = PipelineCreateFlags.CreateLibraryBitKhr | PipelineCreateFlags.CreateRetainLinkTimeOptimizationInfoBitExt,
+                PNext = &library,
+                StageCount = StagesCount,
+                PStages = Stages.Pointer,
+                PTessellationState = &tessellationState,
+                PViewportState = &viewportState,
+                PRasterizationState = &rasterizationState,
+                Layout = PipelineLayout,
+                RenderPass = renderPass,
+                PDynamicState = &pipelineDynamicStateCreateInfo,
+            };
+            
+            gd.Api.CreateGraphicsPipelines(device, libraryCache, 1, &pipelineCreateInfo, null, &pipelinesssss[1]);
+            
+            pipelinelib2 = new Auto<DisposablePipeline>(new DisposablePipeline(gd.Api, device, pipelinesssss[1]));
+
+        }
+
+        private unsafe void PipelineVertexInputStateCreateInfo(Pipeline* pipelinesssss, Device device,
+            VulkanRenderer gd,
+            RenderPass renderPass,
+            bool isMoltenVk,
+            VertexInputAttributeDescription* pVertexAttributeDescriptions2,
+            VertexInputAttributeDescription* pVertexAttributeDescriptions,
+            VertexInputBindingDescription* pVertexBindingDescriptions, PipelineCache libraryCache)
+        {
+            var vertexInputState = new PipelineVertexInputStateCreateInfo
+            {
+                SType = StructureType.PipelineVertexInputStateCreateInfo,
+                VertexAttributeDescriptionCount = VertexAttributeDescriptionsCount,
+                PVertexAttributeDescriptions = isMoltenVk ? pVertexAttributeDescriptions2 : pVertexAttributeDescriptions,
+                VertexBindingDescriptionCount = VertexBindingDescriptionsCount,
+                PVertexBindingDescriptions = pVertexBindingDescriptions,
+            };
+
+            bool primitiveRestartEnable = PrimitiveRestartEnable;
+
+            bool topologySupportsRestart;
+
+            if (gd.Capabilities.SupportsPrimitiveTopologyListRestart)
+            {
+                topologySupportsRestart = gd.Capabilities.SupportsPrimitiveTopologyPatchListRestart || Topology != PrimitiveTopology.PatchList;
+            }
+            else
+            {
+                topologySupportsRestart = Topology == PrimitiveTopology.LineStrip ||
+                                          Topology == PrimitiveTopology.TriangleStrip ||
+                                          Topology == PrimitiveTopology.TriangleFan ||
+                                          Topology == PrimitiveTopology.LineStripWithAdjacency ||
+                                          Topology == PrimitiveTopology.TriangleStripWithAdjacency;
+            }
+
+            primitiveRestartEnable &= topologySupportsRestart;
+
+            var inputAssemblyState = new PipelineInputAssemblyStateCreateInfo
+            {
+                SType = StructureType.PipelineInputAssemblyStateCreateInfo,
+                PrimitiveRestartEnable = primitiveRestartEnable,
+                Topology = Topology,
+            };
+            
+            var library = new GraphicsPipelineLibraryCreateInfoEXT
+            {
+                SType = StructureType.GraphicsPipelineLibraryCreateInfoExt,
+                Flags = GraphicsPipelineLibraryFlagsEXT.VertexInputInterfaceBitExt,
+            };
+            
+            var pipelineCreateInfo = new GraphicsPipelineCreateInfo
+            {
+                SType = StructureType.GraphicsPipelineCreateInfo,
+                Flags = PipelineCreateFlags.CreateLibraryBitKhr | PipelineCreateFlags.CreateRetainLinkTimeOptimizationInfoBitExt,
+                PNext = &library,
+                PVertexInputState = &vertexInputState,
+                PInputAssemblyState = &inputAssemblyState,
+            };
+            
+            bool supportsExtDynamicState = gd.Capabilities.SupportsExtendedDynamicState;
+            if (supportsExtDynamicState)
+            {
+                DynamicState* dynamicStates = stackalloc DynamicState[1];
+                dynamicStates[0] = DynamicState.VertexInputBindingStrideExt;
+                
+                var pipelineDynamicStateCreateInfo = new PipelineDynamicStateCreateInfo
+                {
+                    SType = StructureType.PipelineDynamicStateCreateInfo,
+                    DynamicStateCount = 1,
+                    PDynamicStates = dynamicStates,
+                };
+
+                pipelineCreateInfo.PDynamicState = &pipelineDynamicStateCreateInfo;
+            }
+
+            gd.Api.CreateGraphicsPipelines(device, libraryCache, 1, &pipelineCreateInfo, null, &pipelinesssss[0]);
+            
+            pipelinelib1 = new Auto<DisposablePipeline>(new DisposablePipeline(gd.Api, device, pipelinesssss[0]));
+
         }
 
         private void UpdateVertexAttributeDescriptions(VulkanRenderer gd)

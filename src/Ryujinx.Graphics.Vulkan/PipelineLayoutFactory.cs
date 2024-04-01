@@ -13,7 +13,7 @@ namespace Ryujinx.Graphics.Vulkan
             bool usePushDescriptors)
         {
             DescriptorSetLayout[] layouts = new DescriptorSetLayout[setDescriptors.Count];
-
+            
             bool isMoltenVk = gd.IsMoltenVk;
 
             for (int setIndex = 0; setIndex < setDescriptors.Count; setIndex++)
@@ -65,10 +65,11 @@ namespace Ryujinx.Graphics.Vulkan
                     };
 
                     gd.Api.CreateDescriptorSetLayout(device, descriptorSetLayoutCreateInfo, null, out layouts[setIndex]).ThrowOnError();
+
                 }
             }
 
-            PipelineLayout layout;
+            PipelineLayout pipelineLayout;
 
             fixed (DescriptorSetLayout* pLayouts = layouts)
             {
@@ -77,12 +78,13 @@ namespace Ryujinx.Graphics.Vulkan
                     SType = StructureType.PipelineLayoutCreateInfo,
                     PSetLayouts = pLayouts,
                     SetLayoutCount = (uint)layouts.Length,
+                    Flags = PipelineLayoutCreateFlags.IndependentSetsBitExt,
                 };
 
-                gd.Api.CreatePipelineLayout(device, &pipelineLayoutCreateInfo, null, out layout).ThrowOnError();
+                gd.Api.CreatePipelineLayout(device, &pipelineLayoutCreateInfo, null, out pipelineLayout).ThrowOnError();
             }
 
-            return (layouts, layout);
+            return (layouts, pipelineLayout);
         }
     }
 }

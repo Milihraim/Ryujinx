@@ -28,6 +28,10 @@ namespace Ryujinx.Graphics.Vulkan
         protected readonly VulkanRenderer Gd;
         protected readonly Device Device;
         public readonly PipelineCache PipelineCache;
+        public readonly PipelineCache LibraryVertexCache;
+        public readonly PipelineCache LibraryPrerasterCache;
+        public readonly PipelineCache LibraryFragShadCache;
+        public readonly PipelineCache LibraryFragOutCache;
 
         public readonly AutoFlushCounter AutoFlush;
         public readonly Action EndRenderPassDelegate;
@@ -104,6 +108,12 @@ namespace Ryujinx.Graphics.Vulkan
             };
 
             gd.Api.CreatePipelineCache(device, pipelineCacheCreateInfo, null, out PipelineCache).ThrowOnError();
+            gd.Api.CreatePipelineCache(device, pipelineCacheCreateInfo, null, out LibraryVertexCache).ThrowOnError();
+            gd.Api.CreatePipelineCache(device, pipelineCacheCreateInfo, null, out LibraryPrerasterCache).ThrowOnError();
+            gd.Api.CreatePipelineCache(device, pipelineCacheCreateInfo, null, out LibraryFragShadCache).ThrowOnError();
+            gd.Api.CreatePipelineCache(device, pipelineCacheCreateInfo, null, out LibraryFragOutCache).ThrowOnError();
+
+
 
             _descriptorSetUpdater = new DescriptorSetUpdater(gd, device, this);
             _vertexBufferUpdater = new VertexBufferUpdater(gd);
@@ -1623,7 +1633,7 @@ namespace Ryujinx.Graphics.Vulkan
 
                 var pipeline = pbp == PipelineBindPoint.Compute
                     ? _newState.CreateComputePipeline(Gd, Device, _program, PipelineCache)
-                    : _newState.CreateGraphicsPipeline(Gd, Device, _program, PipelineCache, _renderPass.Get(Cbs).Value);
+                    : _newState.CreateGraphicsPipeline(Gd, Device, _program, PipelineCache, LibraryVertexCache, LibraryVertexCache, LibraryFragShadCache, LibraryFragOutCache, _renderPass.Get(Cbs).Value);
 
                 if (pipeline == null)
                 {
@@ -1738,6 +1748,11 @@ namespace Ryujinx.Graphics.Vulkan
                 unsafe
                 {
                     Gd.Api.DestroyPipelineCache(Device, PipelineCache, null);
+                    Gd.Api.DestroyPipelineCache(Device, LibraryVertexCache, null);
+                    Gd.Api.DestroyPipelineCache(Device, LibraryPrerasterCache, null);
+                    Gd.Api.DestroyPipelineCache(Device, LibraryFragShadCache, null);
+                    Gd.Api.DestroyPipelineCache(Device, LibraryFragOutCache, null);
+
                 }
             }
         }
