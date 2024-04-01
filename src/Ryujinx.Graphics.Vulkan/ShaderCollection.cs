@@ -463,8 +463,8 @@ namespace Ryujinx.Graphics.Vulkan
 
             pipeline.StagesCount = (uint)_shaders.Length;
             pipeline.PipelineLayout = PipelineLayout;
-            
-            pipeline.CreateGraphicsPipeline(_gd, _device, this, (_gd.Pipeline as PipelineBase).PipelineCache, (_gd.Pipeline as PipelineBase).LibraryVertexCache, (_gd.Pipeline as PipelineBase).LibraryPrerasterCache, (_gd.Pipeline as PipelineBase).LibraryFragShadCache, (_gd.Pipeline as PipelineBase).LibraryFragOutCache, renderPass.Value, throwOnError: true);
+
+            pipeline.CreateGraphicsPipeline(_gd, _device, this, (_gd.Pipeline as PipelineBase).PipelineCache, (_gd.Pipeline as PipelineBase).LibraryVertexCache, (_gd.Pipeline as PipelineBase).LibraryPrerasterCache, (_gd.Pipeline as PipelineBase).LibraryFragShadCache, (_gd.Pipeline as PipelineBase).LibraryFragOutCache, renderPass.Value, background: true, throwOnError: true);
             pipeline.Dispose();
         }
 

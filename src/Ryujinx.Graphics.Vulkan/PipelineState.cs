@@ -397,6 +397,7 @@ namespace Ryujinx.Graphics.Vulkan
             PipelineCache fragShadCache,
             PipelineCache fragOutCache,
             RenderPass renderPass,
+            bool background = false,
             bool throwOnError = false)
         {
             if (program.TryGetGraphicsPipeline(ref Internal, out var pipeline))
@@ -464,9 +465,17 @@ namespace Ryujinx.Graphics.Vulkan
                 {
                     SType = StructureType.GraphicsPipelineCreateInfo,
                     PNext = &pipelinelibrary,
-                    Flags = PipelineCreateFlags.CreateLinkTimeOptimizationBitExt,
                     Layout = PipelineLayout,
                 };
+
+                if (background)
+                {
+                    pipelineCreateInfo.Flags = PipelineCreateFlags.CreateLinkTimeOptimizationBitExt;
+                }
+                else
+                {
+                    pipelineCreateInfo.Flags = PipelineCreateFlags.None;
+                }
 
                 Result result = gd.Api.CreateGraphicsPipelines(device, cache, 1, &pipelineCreateInfo, null, &pipelineHandle);
 
