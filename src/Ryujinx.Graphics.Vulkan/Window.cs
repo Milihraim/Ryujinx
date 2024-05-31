@@ -18,6 +18,7 @@ namespace Ryujinx.Graphics.Vulkan
         private readonly PhysicalDevice _physicalDevice;
         private readonly Device _device;
         private SwapchainKHR _swapchain;
+        private SwapchainKHR _oldswapchain;
 
         private Image[] _swapchainImages;
         private TextureView[] _swapchainImageViews;
@@ -48,15 +49,13 @@ namespace Ryujinx.Graphics.Vulkan
             _physicalDevice = physicalDevice;
             _device = device;
             _surface = surface;
+            _oldswapchain.Handle = 0;
 
             CreateSwapchain();
         }
 
-        private void RecreateSwapchain()
+        private void DestroySwapchain()
         {
-            var oldSwapchain = _swapchain;
-            _swapchainIsDirty = false;
-
             for (int i = 0; i < _swapchainImageViews.Length; i++)
             {
                 _swapchainImageViews[i].Dispose();
@@ -78,10 +77,6 @@ namespace Ryujinx.Graphics.Vulkan
                     _gd.Api.DestroySemaphore(_device, _renderFinishedSemaphores[i], null);
                 }
             }
-
-            _gd.SwapchainApi.DestroySwapchain(_device, oldSwapchain, Span<AllocationCallbacks>.Empty);
-
-            CreateSwapchain();
         }
 
         private unsafe void CreateSwapchain()
@@ -124,8 +119,6 @@ namespace Ryujinx.Graphics.Vulkan
             _height = (int)extent.Height;
             _format = surfaceFormat.Format;
 
-            var oldSwapchain = _swapchain;
-
             var swapchainCreateInfo = new SwapchainCreateInfoKHR
             {
                 SType = StructureType.SwapchainCreateInfoKhr,
@@ -142,6 +135,11 @@ namespace Ryujinx.Graphics.Vulkan
                 PresentMode = ChooseSwapPresentMode(presentModes, _vsyncEnabled),
                 Clipped = true,
             };
+
+            if (_oldswapchain.Handle != 0)
+            {
+                swapchainCreateInfo.OldSwapchain = _oldswapchain;
+            }
 
             var textureCreateInfo = new TextureCreateInfo(
                 _width,
@@ -169,6 +167,11 @@ namespace Ryujinx.Graphics.Vulkan
             fixed (Image* pSwapchainImages = _swapchainImages)
             {
                 _gd.SwapchainApi.GetSwapchainImages(_device, _swapchain, &imageCount, pSwapchainImages);
+            }
+
+            if (_oldswapchain.Handle != 0)
+            {
+                DestroySwapchain();
             }
 
             _swapchainImageViews = new TextureView[imageCount];
@@ -329,7 +332,15 @@ namespace Ryujinx.Graphics.Vulkan
                     acquireResult == Result.SuboptimalKhr ||
                     _swapchainIsDirty)
                 {
-                    RecreateSwapchain();
+                    if (_oldswapchain.Handle != 0)
+                    {
+                        _gd.SwapchainApi.DestroySwapchain(_device, _oldswapchain, null);
+                        _swapchainIsDirty = false;
+                    }
+
+                    _oldswapchain = _swapchain;
+
+                    CreateSwapchain();
                     semaphoreIndex = (_frameIndex - 1) % _imageAvailableSemaphores.Length;
                 }
                 else
