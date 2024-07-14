@@ -587,7 +587,7 @@ namespace Ryujinx.Graphics.Vulkan
                 FormatFeatureFlags.SampledImageFilterLinearBit |
                 FormatFeatureFlags.BlitSrcBit |
                 FormatFeatureFlags.TransferSrcBit |
-                FormatFeatureFlags.TransferDstBit;
+                FormatFeatureFlags.TransferDstBit | FormatFeatureFlags.StorageImageBit;
 
             bool supportsBc123CompressionFormat = FormatCapabilities.OptimalFormatsSupport(compressedFormatFeatureFlags,
                 Format.Bc1RgbaSrgb,

@@ -87,7 +87,12 @@ namespace Ryujinx.Graphics.Vulkan
             {
                 if (!OptimalFormatSupports(flags, format))
                 {
-                    return false;
+                    flags &= ~FormatFeatureFlags.StorageImageBit;
+                    
+                    if (!OptimalFormatSupports(flags, format))
+                    {
+                        return false;
+                    }
                 }
             }
 
@@ -148,7 +153,7 @@ namespace Ryujinx.Graphics.Vulkan
             return (formatFeatureFlags & flags) == flags;
         }
 
-        public VkFormat ConvertToVkFormat(Format srcFormat)
+        public VkFormat ConvertToVkFormat(Format srcFormat, bool supported = true)
         {
             var format = FormatTable.GetFormat(srcFormat);
 
@@ -165,7 +170,7 @@ namespace Ryujinx.Graphics.Vulkan
                 requiredFeatures |= FormatFeatureFlags.ColorAttachmentBit;
             }
 
-            if (srcFormat.IsImageCompatible())
+            if (srcFormat.IsImageCompatible() && supported)
             {
                 requiredFeatures |= FormatFeatureFlags.StorageImageBit;
             }

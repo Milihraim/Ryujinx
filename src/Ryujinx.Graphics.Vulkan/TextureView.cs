@@ -59,8 +59,14 @@ namespace Ryujinx.Graphics.Vulkan
 
             gd.Textures.Add(this);
 
-            var format = _gd.FormatCapabilities.ConvertToVkFormat(info.Format);
+            var format = _gd.FormatCapabilities.ConvertToVkFormat(info.Format, (gd.Capabilities.SupportsShaderStorageImageMultisample || !info.Target.IsMultisample()));
             var usage = TextureStorage.GetImageUsage(info.Format, info.Target, gd.Capabilities.SupportsShaderStorageImageMultisample);
+            var imageusage = TextureStorage.GetImageUsage(storage.Info.Format, storage.Info.Target, gd.Capabilities.SupportsShaderStorageImageMultisample);
+            bool storageconsistent = (usage.HasFlag(ImageUsageFlags.StorageBit)) &&
+                                     (!imageusage.HasFlag(ImageUsageFlags.StorageBit));
+            
+            usage &= imageusage;
+            
             var levels = (uint)info.Levels;
             var layers = (uint)info.GetLayers();
 
@@ -123,10 +129,12 @@ namespace Ryujinx.Graphics.Vulkan
 
             ImageUsageFlags shaderUsage = ImageUsageFlags.SampledBit;
 
-            if (info.Format.IsImageCompatible() && (_gd.Capabilities.SupportsShaderStorageImageMultisample || !info.Target.IsMultisample()))
+            if (storageconsistent && info.Format.IsImageCompatible() && (_gd.Capabilities.SupportsShaderStorageImageMultisample || !info.Target.IsMultisample()))
             {
                 shaderUsage |= ImageUsageFlags.StorageBit;
             }
+            
+            shaderUsage &= imageusage;
 
             _imageView = CreateImageView(componentMapping, subresourceRange, type, shaderUsage);
 
