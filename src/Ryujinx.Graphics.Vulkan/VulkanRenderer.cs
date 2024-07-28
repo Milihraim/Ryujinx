@@ -424,8 +424,7 @@ namespace Ryujinx.Graphics.Vulkan
                 properties.Limits.SubTexelPrecisionBits,
                 minResourceAlignment,
                 featuresNonSeamlessCubeMapFeaturesExt.NonSeamlessCubeMap,
-                (featuresPrimitiveGeneratedQueryFeatures.PrimitivesGeneratedQuery &&
-                 featuresPrimitiveGeneratedQueryFeatures.PrimitivesGeneratedQueryWithRasterizerDiscard));
+                featuresPrimitiveGeneratedQueryFeatures);
 
             IsSharedMemory = MemoryAllocator.IsDeviceMemoryShared(_physicalDevice);
 

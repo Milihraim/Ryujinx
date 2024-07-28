@@ -53,7 +53,7 @@ namespace Ryujinx.Graphics.Vulkan
         public readonly uint SubTexelPrecisionBits;
         public readonly ulong MinResourceAlignment;
         public readonly bool SupportsNonSeamlessCubemaps;
-        public readonly bool SupportsPrimitiveGeneratedQueries;
+        public readonly PhysicalDevicePrimitivesGeneratedQueryFeaturesEXT SupportsPrimitiveGeneratedQueries;
 
         public HardwareCapabilities(
             bool supportsIndexTypeUint8,
@@ -93,7 +93,7 @@ namespace Ryujinx.Graphics.Vulkan
             uint subTexelPrecisionBits,
             ulong minResourceAlignment,
             bool supportsNonSeamlessCubemaps,
-            bool supportsPrimitiveGeneratedQueries)
+            PhysicalDevicePrimitivesGeneratedQueryFeaturesEXT supportsPrimitiveGeneratedQueries)
         {
             SupportsIndexTypeUint8 = supportsIndexTypeUint8;
             SupportsCustomBorderColor = supportsCustomBorderColor;

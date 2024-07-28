@@ -41,14 +41,14 @@ namespace Ryujinx.Graphics.Vulkan.Queries
 
             if (_isSupported)
             {
-                bool statisticQuery = type == CounterType.PrimitivesGenerated && !gd.Capabilities.SupportsPrimitiveGeneratedQueries;
+                bool statisticQuery = type == CounterType.PrimitivesGenerated && !gd.Capabilities.SupportsPrimitiveGeneratedQueries.PrimitivesGeneratedQuery;
 
                 var queryPoolCreateInfo = new QueryPoolCreateInfo
                 {
                     SType = StructureType.QueryPoolCreateInfo,
                     QueryCount = 1,
-                    QueryType = GetQueryType(type, gd.Capabilities.SupportsPrimitiveGeneratedQueries),
-                    PipelineStatistics = statisticQuery ? QueryPipelineStatisticFlags.GeometryShaderPrimitivesBit : 0,
+                    QueryType = GetQueryType(type, gd.Capabilities.SupportsPrimitiveGeneratedQueries.PrimitivesGeneratedQuery),
+                    PipelineStatistics = statisticQuery ? QueryPipelineStatisticFlags.ClippingInvocationsBit: 0,
                 };
 
                 gd.Api.CreateQueryPool(device, queryPoolCreateInfo, null, out _queryPool).ThrowOnError();
@@ -67,7 +67,7 @@ namespace Ryujinx.Graphics.Vulkan.Queries
             return type switch
             {
                 CounterType.SamplesPassed => true,
-                CounterType.PrimitivesGenerated => gd.Capabilities.SupportsPipelineStatisticsQuery || gd.Capabilities.SupportsPrimitiveGeneratedQueries,
+                CounterType.PrimitivesGenerated => gd.Capabilities.SupportsPipelineStatisticsQuery || gd.Capabilities.SupportsPrimitiveGeneratedQueries.PrimitivesGeneratedQuery,
                 CounterType.TransformFeedbackPrimitivesWritten => gd.Capabilities.SupportsTransformFeedbackQueries,
                 _ => false,
             };
@@ -102,6 +102,7 @@ namespace Ryujinx.Graphics.Vulkan.Queries
                 bool needsReset = resetSequence == null || _resetSequence == null || resetSequence.Value != _resetSequence.Value;
                 bool isOcclusion = _type == CounterType.SamplesPassed;
                 _pipeline.BeginQuery(this, _queryPool, needsReset, isOcclusion, isOcclusion && resetSequence != null);
+                _pipeline.PrimitiveGeneratesQueryActive = _type == CounterType.PrimitivesGenerated;
             }
             _resetSequence = null;
         }
@@ -123,6 +124,8 @@ namespace Ryujinx.Graphics.Vulkan.Queries
                 // Dummy result, just return 0.
                 Marshal.WriteInt64(_bufferMap, 0);
             }
+            
+            _pipeline.PrimitiveGeneratesQueryActive = false;
         }
 
         private bool WaitingForValue(long data)

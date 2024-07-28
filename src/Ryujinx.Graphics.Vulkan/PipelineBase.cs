@@ -79,6 +79,8 @@ namespace Ryujinx.Graphics.Vulkan
         public IndexBufferPattern QuadsToTrisPattern;
         public IndexBufferPattern TriFanToTrisPattern;
 
+        public bool PrimitiveGeneratesQueryActive;
+
         private bool _needsIndexBufferRebind;
         private bool _needsTransformFeedbackBuffersRebind;
 
@@ -961,7 +963,16 @@ namespace Ryujinx.Graphics.Vulkan
 
         public void SetRasterizerDiscard(bool discard)
         {
-            _newState.RasterizerDiscardEnable = discard;
+            if (discard && PrimitiveGeneratesQueryActive && !Gd.Capabilities.SupportsPrimitiveGeneratedQueries.PrimitivesGeneratedQueryWithRasterizerDiscard)
+            {
+                Rect2D empty = new ();
+                Gd.Api.CmdSetScissor(CommandBuffer, 0, 1, empty);
+                _newState.RasterizerDiscardEnable = false;
+            }
+            else
+            {
+                _newState.RasterizerDiscardEnable = discard;
+            }
             SignalStateChange();
 
             if (!discard && Gd.IsQualcommProprietary)

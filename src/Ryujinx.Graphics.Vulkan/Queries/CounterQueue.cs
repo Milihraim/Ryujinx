@@ -155,7 +155,7 @@ namespace Ryujinx.Graphics.Vulkan.Queries
                     _current.ReserveForHostAccess();
                 }
 
-                _current.Complete(draws > 0 && Type != CounterType.TransformFeedbackPrimitivesWritten, divisor);
+                _current.Complete(draws > 0, divisor);
                 _events.Enqueue(_current);
 
                 _current.OnResult += resultHandler;
