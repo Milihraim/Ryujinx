@@ -222,6 +222,11 @@ namespace Ryujinx.Graphics.Vulkan
             {
                 SType = StructureType.PhysicalDevicePrimitiveTopologyListRestartFeaturesExt,
             };
+            
+            PhysicalDeviceNonSeamlessCubeMapFeaturesEXT featuresNonSeamlessCubeMapFeaturesExt = new()
+            {
+                SType = StructureType.PhysicalDeviceNonSeamlessCubeMapFeaturesExt,
+            };
 
             PhysicalDeviceRobustness2FeaturesEXT featuresRobustness2 = new()
             {
@@ -257,6 +262,12 @@ namespace Ryujinx.Graphics.Vulkan
             {
                 featuresRobustness2.PNext = features2.PNext;
                 features2.PNext = &featuresRobustness2;
+            }
+            
+            if (_physicalDevice.IsDeviceExtensionPresent("VK_EXT_non_seamless_cube_map"))
+            {
+                featuresNonSeamlessCubeMapFeaturesExt.PNext = features2.PNext;
+                features2.PNext = &featuresNonSeamlessCubeMapFeaturesExt;
             }
 
             if (_physicalDevice.IsDeviceExtensionPresent("VK_KHR_shader_float16_int8"))
@@ -406,7 +417,8 @@ namespace Ryujinx.Graphics.Vulkan
                 portabilityFlags,
                 vertexBufferAlignment,
                 properties.Limits.SubTexelPrecisionBits,
-                minResourceAlignment);
+                minResourceAlignment,
+                featuresNonSeamlessCubeMapFeaturesExt.NonSeamlessCubeMap);
 
             IsSharedMemory = MemoryAllocator.IsDeviceMemoryShared(_physicalDevice);
 

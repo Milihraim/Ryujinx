@@ -52,6 +52,7 @@ namespace Ryujinx.Graphics.Vulkan
         public readonly uint VertexBufferAlignment;
         public readonly uint SubTexelPrecisionBits;
         public readonly ulong MinResourceAlignment;
+        public readonly bool SupportsNonSeamlessCubemaps;
 
         public HardwareCapabilities(
             bool supportsIndexTypeUint8,
@@ -89,7 +90,8 @@ namespace Ryujinx.Graphics.Vulkan
             PortabilitySubsetFlags portabilitySubset,
             uint vertexBufferAlignment,
             uint subTexelPrecisionBits,
-            ulong minResourceAlignment)
+            ulong minResourceAlignment,
+            bool supportsNonSeamlessCubemaps)
         {
             SupportsIndexTypeUint8 = supportsIndexTypeUint8;
             SupportsCustomBorderColor = supportsCustomBorderColor;
@@ -127,6 +129,7 @@ namespace Ryujinx.Graphics.Vulkan
             VertexBufferAlignment = vertexBufferAlignment;
             SubTexelPrecisionBits = subTexelPrecisionBits;
             MinResourceAlignment = minResourceAlignment;
+            SupportsNonSeamlessCubemaps = supportsNonSeamlessCubemaps;
         }
     }
 }

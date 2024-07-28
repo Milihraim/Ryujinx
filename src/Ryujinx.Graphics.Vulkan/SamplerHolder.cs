@@ -48,6 +48,11 @@ namespace Ryujinx.Graphics.Vulkan
                 UnnormalizedCoordinates = false, // TODO: Use unnormalized coordinates.
             };
 
+            if (gd.Capabilities.SupportsNonSeamlessCubemaps)
+            {
+                samplerCreateInfo.Flags = info.SeamlessCubemap ? 0 : SamplerCreateFlags.NonSeamlessCubeMapBitExt;
+            }
+
             SamplerCustomBorderColorCreateInfoEXT customBorderColor;
 
             if (cantConstrain && gd.Capabilities.SupportsCustomBorderColor)

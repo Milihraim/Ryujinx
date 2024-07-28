@@ -356,6 +356,17 @@ namespace Ryujinx.Graphics.Vulkan
             {
                 features2.PNext = &supportedFeaturesDepthClipControl;
             }
+            
+            PhysicalDeviceNonSeamlessCubeMapFeaturesEXT supportedFeatureNonSeamlessCubeMapFeatures = new()
+            {
+                SType = StructureType.PhysicalDeviceNonSeamlessCubeMapFeaturesExt,
+                PNext = features2.PNext,
+            };
+
+            if (physicalDevice.IsDeviceExtensionPresent("VK_EXT_non_seamless_cube_map"))
+            {
+                features2.PNext = &supportedFeatureNonSeamlessCubeMapFeatures;
+            }
 
             PhysicalDeviceVulkan12Features supportedPhysicalDeviceVulkan12Features = new()
             {
@@ -497,6 +508,20 @@ namespace Ryujinx.Graphics.Vulkan
                 };
 
                 pExtendedFeatures = &featuresFragmentShaderInterlock;
+            }
+            
+            PhysicalDeviceNonSeamlessCubeMapFeaturesEXT featuresNonSeamlessCubeMap;
+
+            if (physicalDevice.IsDeviceExtensionPresent("VK_EXT_non_seamless_cube_map"))
+            {
+                featuresNonSeamlessCubeMap = new PhysicalDeviceNonSeamlessCubeMapFeaturesEXT
+                {
+                    SType = StructureType.PhysicalDeviceFragmentShaderInterlockFeaturesExt,
+                    PNext = pExtendedFeatures,
+                    NonSeamlessCubeMap = supportedFeatureNonSeamlessCubeMapFeatures.NonSeamlessCubeMap,
+                };
+
+                pExtendedFeatures = &featuresNonSeamlessCubeMap;
             }
 
             PhysicalDeviceCustomBorderColorFeaturesEXT featuresCustomBorderColor;
