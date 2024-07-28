@@ -48,7 +48,7 @@ namespace Ryujinx.Graphics.Vulkan.Queries
                     SType = StructureType.QueryPoolCreateInfo,
                     QueryCount = 1,
                     QueryType = GetQueryType(type, gd.Capabilities.SupportsPrimitiveGeneratedQueries.PrimitivesGeneratedQuery),
-                    PipelineStatistics = statisticQuery ? QueryPipelineStatisticFlags.ClippingInvocationsBit: 0,
+                    PipelineStatistics = statisticQuery ? QueryPipelineStatisticFlags.ClippingInvocationsBit : 0,
                 };
 
                 gd.Api.CreateQueryPool(device, queryPoolCreateInfo, null, out _queryPool).ThrowOnError();
@@ -124,7 +124,7 @@ namespace Ryujinx.Graphics.Vulkan.Queries
                 // Dummy result, just return 0.
                 Marshal.WriteInt64(_bufferMap, 0);
             }
-            
+
             _pipeline.PrimitiveGeneratesQueryActive = false;
         }
 

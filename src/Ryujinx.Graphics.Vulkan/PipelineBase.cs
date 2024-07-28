@@ -965,7 +965,7 @@ namespace Ryujinx.Graphics.Vulkan
         {
             if (discard && PrimitiveGeneratesQueryActive && !Gd.Capabilities.SupportsPrimitiveGeneratedQueries.PrimitivesGeneratedQueryWithRasterizerDiscard)
             {
-                Rect2D empty = new ();
+                Rect2D empty = new();
                 Gd.Api.CmdSetScissor(CommandBuffer, 0, 1, empty);
                 _newState.RasterizerDiscardEnable = false;
             }
