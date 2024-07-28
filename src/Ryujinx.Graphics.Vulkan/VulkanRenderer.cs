@@ -227,6 +227,11 @@ namespace Ryujinx.Graphics.Vulkan
             {
                 SType = StructureType.PhysicalDeviceNonSeamlessCubeMapFeaturesExt,
             };
+            
+            PhysicalDevicePrimitivesGeneratedQueryFeaturesEXT featuresPrimitiveGeneratedQueryFeatures = new()
+            {
+                SType = StructureType.PhysicalDeviceNonSeamlessCubeMapFeaturesExt,
+            };
 
             PhysicalDeviceRobustness2FeaturesEXT featuresRobustness2 = new()
             {
@@ -418,7 +423,9 @@ namespace Ryujinx.Graphics.Vulkan
                 vertexBufferAlignment,
                 properties.Limits.SubTexelPrecisionBits,
                 minResourceAlignment,
-                featuresNonSeamlessCubeMapFeaturesExt.NonSeamlessCubeMap);
+                featuresNonSeamlessCubeMapFeaturesExt.NonSeamlessCubeMap,
+                (featuresPrimitiveGeneratedQueryFeatures.PrimitivesGeneratedQuery &&
+                 featuresPrimitiveGeneratedQueryFeatures.PrimitivesGeneratedQueryWithRasterizerDiscard));
 
             IsSharedMemory = MemoryAllocator.IsDeviceMemoryShared(_physicalDevice);
 

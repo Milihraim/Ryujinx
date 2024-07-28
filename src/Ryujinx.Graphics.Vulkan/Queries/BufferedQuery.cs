@@ -41,15 +41,15 @@ namespace Ryujinx.Graphics.Vulkan.Queries
 
             if (_isSupported)
             {
-                QueryPipelineStatisticFlags flags = type == CounterType.PrimitivesGenerated ?
-                    QueryPipelineStatisticFlags.GeometryShaderPrimitivesBit : 0;
+                bool statisticQuery = type == CounterType.PrimitivesGenerated &&
+                                      !gd.Capabilities.SupportsPrimitiveGeneratedQueries;
 
                 var queryPoolCreateInfo = new QueryPoolCreateInfo
                 {
                     SType = StructureType.QueryPoolCreateInfo,
                     QueryCount = 1,
-                    QueryType = GetQueryType(type),
-                    PipelineStatistics = flags,
+                    QueryType = GetQueryType(type, gd.Capabilities.SupportsPrimitiveGeneratedQueries),
+                    PipelineStatistics = statisticQuery ? QueryPipelineStatisticFlags.GeometryShaderPrimitivesBit : 0,
                 };
 
                 gd.Api.CreateQueryPool(device, queryPoolCreateInfo, null, out _queryPool).ThrowOnError();
@@ -68,18 +68,18 @@ namespace Ryujinx.Graphics.Vulkan.Queries
             return type switch
             {
                 CounterType.SamplesPassed => true,
-                CounterType.PrimitivesGenerated => gd.Capabilities.SupportsPipelineStatisticsQuery,
+                CounterType.PrimitivesGenerated => gd.Capabilities.SupportsPipelineStatisticsQuery || gd.Capabilities.SupportsPrimitiveGeneratedQueries,
                 CounterType.TransformFeedbackPrimitivesWritten => gd.Capabilities.SupportsTransformFeedbackQueries,
                 _ => false,
             };
         }
 
-        private static QueryType GetQueryType(CounterType type)
+        private static QueryType GetQueryType(CounterType type, bool supportsPrimitiveGeneratedQueries = false)
         {
             return type switch
             {
                 CounterType.SamplesPassed => QueryType.Occlusion,
-                CounterType.PrimitivesGenerated => QueryType.PipelineStatistics,
+                CounterType.PrimitivesGenerated => supportsPrimitiveGeneratedQueries ? QueryType.PrimitivesGeneratedExt : QueryType.PipelineStatistics,
                 CounterType.TransformFeedbackPrimitivesWritten => QueryType.TransformFeedbackStreamExt,
                 _ => QueryType.Occlusion,
             };

@@ -367,6 +367,17 @@ namespace Ryujinx.Graphics.Vulkan
             {
                 features2.PNext = &supportedFeatureNonSeamlessCubeMapFeatures;
             }
+            
+            PhysicalDevicePrimitivesGeneratedQueryFeaturesEXT supportedPrimitivesGeneratedQueryFeatures = new()
+            {
+                SType = StructureType.PhysicalDevicePrimitivesGeneratedQueryFeaturesExt,
+                PNext = features2.PNext,
+            };
+
+            if (physicalDevice.IsDeviceExtensionPresent("VK_EXT_primitives_generated_query"))
+            {
+                features2.PNext = &supportedPrimitivesGeneratedQueryFeatures;
+            }
 
             PhysicalDeviceVulkan12Features supportedPhysicalDeviceVulkan12Features = new()
             {
@@ -522,6 +533,21 @@ namespace Ryujinx.Graphics.Vulkan
                 };
 
                 pExtendedFeatures = &featuresNonSeamlessCubeMap;
+            }
+            
+            PhysicalDevicePrimitivesGeneratedQueryFeaturesEXT featuresPrimitiveGeneratedQueryFeatures;
+
+            if (physicalDevice.IsDeviceExtensionPresent("VK_EXT_primitives_generated_query"))
+            {
+                featuresPrimitiveGeneratedQueryFeatures = new PhysicalDevicePrimitivesGeneratedQueryFeaturesEXT
+                {
+                    SType = StructureType.PhysicalDeviceFragmentShaderInterlockFeaturesExt,
+                    PNext = pExtendedFeatures,
+                    PrimitivesGeneratedQuery = supportedPrimitivesGeneratedQueryFeatures.PrimitivesGeneratedQuery,
+                    PrimitivesGeneratedQueryWithRasterizerDiscard = supportedPrimitivesGeneratedQueryFeatures.PrimitivesGeneratedQueryWithRasterizerDiscard,
+                };
+
+                pExtendedFeatures = &featuresPrimitiveGeneratedQueryFeatures;
             }
 
             PhysicalDeviceCustomBorderColorFeaturesEXT featuresCustomBorderColor;
