@@ -222,12 +222,12 @@ namespace Ryujinx.Graphics.Vulkan
             {
                 SType = StructureType.PhysicalDevicePrimitiveTopologyListRestartFeaturesExt,
             };
-            
+
             PhysicalDeviceNonSeamlessCubeMapFeaturesEXT featuresNonSeamlessCubeMapFeaturesExt = new()
             {
                 SType = StructureType.PhysicalDeviceNonSeamlessCubeMapFeaturesExt,
             };
-            
+
             PhysicalDevicePrimitivesGeneratedQueryFeaturesEXT featuresPrimitiveGeneratedQueryFeatures = new()
             {
                 SType = StructureType.PhysicalDeviceNonSeamlessCubeMapFeaturesExt,
@@ -268,7 +268,7 @@ namespace Ryujinx.Graphics.Vulkan
                 featuresRobustness2.PNext = features2.PNext;
                 features2.PNext = &featuresRobustness2;
             }
-            
+
             if (_physicalDevice.IsDeviceExtensionPresent("VK_EXT_non_seamless_cube_map"))
             {
                 featuresNonSeamlessCubeMapFeaturesExt.PNext = features2.PNext;

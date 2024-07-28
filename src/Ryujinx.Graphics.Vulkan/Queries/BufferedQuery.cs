@@ -41,8 +41,7 @@ namespace Ryujinx.Graphics.Vulkan.Queries
 
             if (_isSupported)
             {
-                bool statisticQuery = type == CounterType.PrimitivesGenerated &&
-                                      !gd.Capabilities.SupportsPrimitiveGeneratedQueries;
+                bool statisticQuery = type == CounterType.PrimitivesGenerated && !gd.Capabilities.SupportsPrimitiveGeneratedQueries;
 
                 var queryPoolCreateInfo = new QueryPoolCreateInfo
                 {
@@ -74,7 +73,7 @@ namespace Ryujinx.Graphics.Vulkan.Queries
             };
         }
 
-        private static QueryType GetQueryType(CounterType type, bool supportsPrimitiveGeneratedQueries = false)
+        private static QueryType GetQueryType(CounterType type, bool supportsPrimitiveGeneratedQueries)
         {
             return type switch
             {

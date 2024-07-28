@@ -356,7 +356,7 @@ namespace Ryujinx.Graphics.Vulkan
             {
                 features2.PNext = &supportedFeaturesDepthClipControl;
             }
-            
+
             PhysicalDeviceNonSeamlessCubeMapFeaturesEXT supportedFeatureNonSeamlessCubeMapFeatures = new()
             {
                 SType = StructureType.PhysicalDeviceNonSeamlessCubeMapFeaturesExt,
@@ -367,7 +367,7 @@ namespace Ryujinx.Graphics.Vulkan
             {
                 features2.PNext = &supportedFeatureNonSeamlessCubeMapFeatures;
             }
-            
+
             PhysicalDevicePrimitivesGeneratedQueryFeaturesEXT supportedPrimitivesGeneratedQueryFeatures = new()
             {
                 SType = StructureType.PhysicalDevicePrimitivesGeneratedQueryFeaturesExt,
@@ -520,7 +520,7 @@ namespace Ryujinx.Graphics.Vulkan
 
                 pExtendedFeatures = &featuresFragmentShaderInterlock;
             }
-            
+
             PhysicalDeviceNonSeamlessCubeMapFeaturesEXT featuresNonSeamlessCubeMap;
 
             if (physicalDevice.IsDeviceExtensionPresent("VK_EXT_non_seamless_cube_map"))
@@ -534,7 +534,7 @@ namespace Ryujinx.Graphics.Vulkan
 
                 pExtendedFeatures = &featuresNonSeamlessCubeMap;
             }
-            
+
             PhysicalDevicePrimitivesGeneratedQueryFeaturesEXT featuresPrimitiveGeneratedQueryFeatures;
 
             if (physicalDevice.IsDeviceExtensionPresent("VK_EXT_primitives_generated_query"))
