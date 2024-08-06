@@ -37,7 +37,6 @@ namespace Ryujinx.Graphics.Vulkan
         internal ExtExtendedDynamicState ExtendedDynamicStateApi { get; private set; }
         internal KhrPushDescriptor PushDescriptorApi { get; private set; }
         internal ExtTransformFeedback TransformFeedbackApi { get; private set; }
-        internal KhrDrawIndirectCount DrawIndirectCountApi { get; private set; }
 
         internal uint QueueFamilyIndex { get; private set; }
         internal Queue Queue { get; private set; }
@@ -144,11 +143,6 @@ namespace Ryujinx.Graphics.Vulkan
                 TransformFeedbackApi = transformFeedbackApi;
             }
 
-            if (Api.TryGetDeviceExtension(_instance.Instance, _device, out KhrDrawIndirectCount drawIndirectCountApi))
-            {
-                DrawIndirectCountApi = drawIndirectCountApi;
-            }
-
             if (maxQueueCount >= 2)
             {
                 Api.GetDeviceQueue(_device, queueFamilyIndex, 1, out var backgroundQueue);
@@ -227,6 +221,15 @@ namespace Ryujinx.Graphics.Vulkan
             {
                 SType = StructureType.PhysicalDeviceRobustness2FeaturesExt,
             };
+            
+            
+            PhysicalDeviceVulkan12Features featuresVulkan12 = new()
+            {
+                SType = StructureType.PhysicalDeviceVulkan12Features,
+                PNext = features2.PNext,
+            };
+            
+            features2.PNext = &featuresVulkan12;
 
             PhysicalDeviceShaderFloat16Int8FeaturesKHR featuresShaderInt8 = new()
             {
@@ -377,7 +380,7 @@ namespace Ryujinx.Graphics.Vulkan
                 propertiesBlendOperationAdvanced.AdvancedBlendCorrelatedOverlap,
                 propertiesBlendOperationAdvanced.AdvancedBlendNonPremultipliedSrcColor,
                 propertiesBlendOperationAdvanced.AdvancedBlendNonPremultipliedDstColor,
-                _physicalDevice.IsDeviceExtensionPresent(KhrDrawIndirectCount.ExtensionName),
+                featuresVulkan12.DrawIndirectCount,
                 _physicalDevice.IsDeviceExtensionPresent("VK_EXT_fragment_shader_interlock"),
                 _physicalDevice.IsDeviceExtensionPresent("VK_NV_geometry_shader_passthrough"),
                 features2.Features.ShaderFloat64,

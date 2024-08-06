@@ -516,7 +516,7 @@ namespace Ryujinx.Graphics.Vulkan
 
                 if (Gd.Capabilities.SupportsIndirectParameters)
                 {
-                    Gd.DrawIndirectCountApi.CmdDrawIndexedIndirectCount(
+                    Gd.Api.CmdDrawIndexedIndirectCount(
                         CommandBuffer,
                         indirectBufferAuto.Get(Cbs, 0, indirectBuffer.Size).Value,
                         0,
@@ -544,7 +544,7 @@ namespace Ryujinx.Graphics.Vulkan
 
                 if (Gd.Capabilities.SupportsIndirectParameters)
                 {
-                    Gd.DrawIndirectCountApi.CmdDrawIndexedIndirectCount(
+                    Gd.Api.CmdDrawIndexedIndirectCount(
                         CommandBuffer,
                         buffer,
                         (ulong)indirectBuffer.Offset,
@@ -613,7 +613,7 @@ namespace Ryujinx.Graphics.Vulkan
             ResumeTransformFeedbackInternal();
             DrawCount++;
 
-            Gd.DrawIndirectCountApi.CmdDrawIndirectCount(
+            Gd.Api.CmdDrawIndirectCount(
                 CommandBuffer,
                 buffer,
                 (ulong)indirectBuffer.Offset,

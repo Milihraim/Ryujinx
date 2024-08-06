@@ -24,7 +24,6 @@ namespace Ryujinx.Graphics.Vulkan
             ExtConditionalRendering.ExtensionName,
             ExtExtendedDynamicState.ExtensionName,
             ExtTransformFeedback.ExtensionName,
-            KhrDrawIndirectCount.ExtensionName,
             KhrPushDescriptor.ExtensionName,
             ExtExternalMemoryHost.ExtensionName,
             "VK_EXT_blend_operation_advanced",
