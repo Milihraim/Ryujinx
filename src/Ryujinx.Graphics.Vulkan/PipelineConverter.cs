@@ -126,19 +126,67 @@ namespace Ryujinx.Graphics.Vulkan
         {
             var (access, stages) = BarrierBatch.GetSubpassAccessSuperset(gd);
 
+            PipelineStageFlags dstStageMask = stages;
+            AccessFlags dstAccess = access;
+            
+            PipelineStageFlags frameBufferStageMask = PipelineStageFlags.FragmentShaderBit | PipelineStageFlags.EarlyFragmentTestsBit | PipelineStageFlags.LateFragmentTestsBit | PipelineStageFlags.ColorAttachmentOutputBit;
+
+            AccessFlags frameBufferAccessMask = AccessFlags.None | AccessFlags.UniformReadBit |
+                                                AccessFlags.InputAttachmentReadBit | AccessFlags.ShaderReadBit |
+                                                AccessFlags.ShaderWriteBit | AccessFlags.ColorAttachmentReadBit |
+                                                AccessFlags.ColorAttachmentWriteBit |
+                                                AccessFlags.DepthStencilAttachmentReadBit |
+                                                AccessFlags.DepthStencilAttachmentWriteBit | AccessFlags.MemoryReadBit |
+                                                AccessFlags.MemoryWriteBit |
+                                                AccessFlags.AccelerationStructureReadBitKhr |
+                                                AccessFlags.ColorAttachmentReadNoncoherentBitExt;
+
+            if (stages.HasFlag(PipelineStageFlags.FragmentShaderBit) ||
+                stages.HasFlag(PipelineStageFlags.EarlyFragmentTestsBit) ||
+                stages.HasFlag(PipelineStageFlags.LateFragmentTestsBit) ||
+                stages.HasFlag(PipelineStageFlags.ColorAttachmentOutputBit))
+            {
+                dstStageMask &= frameBufferStageMask;
+                dstAccess &= frameBufferAccessMask;
+            }
+            
             return new SubpassDependency(
                 0,
                 0,
                 stages,
-                stages,
+                dstStageMask,
                 access,
-                access,
+                dstAccess,
                 0);
         }
 
         public unsafe static SubpassDependency2 CreateSubpassDependency2(VulkanRenderer gd)
         {
             var (access, stages) = BarrierBatch.GetSubpassAccessSuperset(gd);
+            
+            PipelineStageFlags dstStageMask = stages;
+            AccessFlags dstAccess = access;
+            
+            PipelineStageFlags frameBufferStageMask = PipelineStageFlags.FragmentShaderBit | PipelineStageFlags.EarlyFragmentTestsBit | PipelineStageFlags.LateFragmentTestsBit | PipelineStageFlags.ColorAttachmentOutputBit;
+
+            AccessFlags frameBufferAccessMask = AccessFlags.None | AccessFlags.UniformReadBit |
+                                                AccessFlags.InputAttachmentReadBit | AccessFlags.ShaderReadBit |
+                                                AccessFlags.ShaderWriteBit | AccessFlags.ColorAttachmentReadBit |
+                                                AccessFlags.ColorAttachmentWriteBit |
+                                                AccessFlags.DepthStencilAttachmentReadBit |
+                                                AccessFlags.DepthStencilAttachmentWriteBit | AccessFlags.MemoryReadBit |
+                                                AccessFlags.MemoryWriteBit |
+                                                AccessFlags.AccelerationStructureReadBitKhr |
+                                                AccessFlags.ColorAttachmentReadNoncoherentBitExt;
+
+            if (stages.HasFlag(PipelineStageFlags.FragmentShaderBit) ||
+                stages.HasFlag(PipelineStageFlags.EarlyFragmentTestsBit) ||
+                stages.HasFlag(PipelineStageFlags.LateFragmentTestsBit) ||
+                stages.HasFlag(PipelineStageFlags.ColorAttachmentOutputBit))
+            {
+                dstStageMask &= frameBufferStageMask;
+                dstAccess &= frameBufferAccessMask;
+            }
 
             return new SubpassDependency2(
                 StructureType.SubpassDependency2,
@@ -146,9 +194,9 @@ namespace Ryujinx.Graphics.Vulkan
                 0,
                 0,
                 stages,
-                stages,
+                dstStageMask,
                 access,
-                access,
+                dstAccess,
                 0);
         }
 
