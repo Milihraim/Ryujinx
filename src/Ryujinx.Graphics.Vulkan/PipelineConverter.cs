@@ -131,7 +131,7 @@ namespace Ryujinx.Graphics.Vulkan
             
             PipelineStageFlags frameBufferStageMask = PipelineStageFlags.FragmentShaderBit | PipelineStageFlags.EarlyFragmentTestsBit | PipelineStageFlags.LateFragmentTestsBit | PipelineStageFlags.ColorAttachmentOutputBit;
 
-            AccessFlags frameBufferAccessMask = AccessFlags.None | AccessFlags.UniformReadBit |
+            AccessFlags frameBufferAccessMask = AccessFlags.None |
                                                 AccessFlags.InputAttachmentReadBit | AccessFlags.ShaderReadBit |
                                                 AccessFlags.ShaderWriteBit | AccessFlags.ColorAttachmentReadBit |
                                                 AccessFlags.ColorAttachmentWriteBit |
@@ -169,7 +169,7 @@ namespace Ryujinx.Graphics.Vulkan
             
             PipelineStageFlags frameBufferStageMask = PipelineStageFlags.FragmentShaderBit | PipelineStageFlags.EarlyFragmentTestsBit | PipelineStageFlags.LateFragmentTestsBit | PipelineStageFlags.ColorAttachmentOutputBit;
 
-            AccessFlags frameBufferAccessMask = AccessFlags.None | AccessFlags.UniformReadBit |
+            AccessFlags frameBufferAccessMask = AccessFlags.None |
                                                 AccessFlags.InputAttachmentReadBit | AccessFlags.ShaderReadBit |
                                                 AccessFlags.ShaderWriteBit | AccessFlags.ColorAttachmentReadBit |
                                                 AccessFlags.ColorAttachmentWriteBit |
