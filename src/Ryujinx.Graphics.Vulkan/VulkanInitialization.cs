@@ -44,6 +44,7 @@ namespace Ryujinx.Graphics.Vulkan
             "VK_EXT_4444_formats",
             "VK_KHR_8bit_storage",
             "VK_KHR_maintenance2",
+            ExtPageableDeviceLocalMemory.ExtensionName,
         };
 
         private static readonly string[] _requiredExtensions = {
@@ -334,6 +335,16 @@ namespace Ryujinx.Graphics.Vulkan
                 features2.PNext = &supportedFeaturesTransformFeedback;
             }
 
+            PhysicalDevicePageableDeviceLocalMemoryFeaturesEXT supportPageableDeviceLocalMemory = new()
+            {
+                SType = StructureType.PhysicalDevicePageableDeviceLocalMemoryFeaturesExt, PNext = features2.PNext,
+            };
+
+            if (physicalDevice.IsDeviceExtensionPresent(ExtPageableDeviceLocalMemory.ExtensionName))
+            {
+                features2.PNext = &supportPageableDeviceLocalMemory;
+            }
+
             PhysicalDeviceRobustness2FeaturesEXT supportedFeaturesRobustness2 = new()
             {
                 SType = StructureType.PhysicalDeviceRobustness2FeaturesExt,
@@ -424,6 +435,20 @@ namespace Ryujinx.Graphics.Vulkan
                 };
 
                 pExtendedFeatures = &featuresPrimitiveTopologyListRestart;
+            }
+            
+            PhysicalDevicePageableDeviceLocalMemoryFeaturesEXT featuresPageableDeviceLocalMemory;
+
+            if (physicalDevice.IsDeviceExtensionPresent(ExtPageableDeviceLocalMemory.ExtensionName))
+            {
+                featuresPageableDeviceLocalMemory = new PhysicalDevicePageableDeviceLocalMemoryFeaturesEXT
+                {
+                    SType = StructureType.PhysicalDevicePageableDeviceLocalMemoryFeaturesExt,
+                    PNext = pExtendedFeatures,
+                    PageableDeviceLocalMemory = supportPageableDeviceLocalMemory.PageableDeviceLocalMemory,
+                };
+
+                pExtendedFeatures = &featuresPageableDeviceLocalMemory;
             }
 
             PhysicalDeviceRobustness2FeaturesEXT featuresRobustness2;

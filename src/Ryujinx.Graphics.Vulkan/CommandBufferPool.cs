@@ -251,6 +251,7 @@ namespace Ryujinx.Graphics.Vulkan
                         var commandBufferBeginInfo = new CommandBufferBeginInfo
                         {
                             SType = StructureType.CommandBufferBeginInfo,
+                            Flags = CommandBufferUsageFlags.OneTimeSubmitBit,
                         };
 
                         _api.BeginCommandBuffer(entry.CommandBuffer, commandBufferBeginInfo).ThrowOnError();
