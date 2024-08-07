@@ -323,6 +323,18 @@ namespace Ryujinx.Graphics.Vulkan
             {
                 features2.PNext = &supportedFeaturesExtExtendedDynamicState2;
             }
+            
+            PhysicalDeviceFaultFeaturesEXT supportFaultFeatures = new()
+            {
+                SType = StructureType.PhysicalDeviceFaultFeaturesExt,
+                PNext = features2.PNext,
+            };
+
+            if (physicalDevice.IsDeviceExtensionPresent(ExtDeviceFault.ExtensionName))
+            {
+                features2.PNext = &supportFaultFeatures;
+            }
+
 
             PhysicalDevicePrimitiveTopologyListRestartFeaturesEXT supportedFeaturesPrimitiveTopologyListRestart = new()
             {
@@ -476,6 +488,19 @@ namespace Ryujinx.Graphics.Vulkan
                 };
 
                 pExtendedFeatures = &featuresExtendedDynamicState2;
+            }
+            
+            if (physicalDevice.IsDeviceExtensionPresent(ExtDeviceFault.ExtensionName))
+            {
+                var featuresFault = new PhysicalDeviceFaultFeaturesEXT()
+                {
+                    SType = StructureType.PhysicalDeviceFaultFeaturesExt,
+                    PNext = pExtendedFeatures,
+                    DeviceFault = supportFaultFeatures.DeviceFault,
+                    DeviceFaultVendorBinary = supportFaultFeatures.DeviceFaultVendorBinary,
+                };
+
+                pExtendedFeatures = &featuresFault;
             }
 
             var featuresVk11 = new PhysicalDeviceVulkan11Features
