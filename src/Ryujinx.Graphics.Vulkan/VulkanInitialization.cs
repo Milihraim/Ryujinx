@@ -334,7 +334,17 @@ namespace Ryujinx.Graphics.Vulkan
             {
                 features2.PNext = &supportFaultFeatures;
             }
+            
+            PhysicalDeviceDiagnosticsConfigFeaturesNV diagnosticsfeatures = new()
+            {
+                SType = StructureType.PhysicalDeviceDiagnosticsConfigFeaturesNV,
+                PNext = features2.PNext,
+            };
 
+            if (physicalDevice.IsDeviceExtensionPresent("VK_NV_device_diagnostics_config"))
+            {
+                features2.PNext = &supportFaultFeatures;
+            }
 
             PhysicalDevicePrimitiveTopologyListRestartFeaturesEXT supportedFeaturesPrimitiveTopologyListRestart = new()
             {
@@ -502,6 +512,27 @@ namespace Ryujinx.Graphics.Vulkan
 
                 pExtendedFeatures = &featuresFault;
             }
+            
+            PhysicalDeviceDiagnosticsConfigFeaturesNV featuresDiagnostics = new()
+            {
+                SType = StructureType.PhysicalDeviceDiagnosticsConfigFeaturesNV,
+                PNext = pExtendedFeatures,
+                DiagnosticsConfig = diagnosticsfeatures.DiagnosticsConfig,
+            };
+
+            if (physicalDevice.IsDeviceExtensionPresent("VK_NV_device_diagnostics_config"))
+            {
+                pExtendedFeatures = &featuresDiagnostics;
+            }
+            
+            var test = new DeviceDiagnosticsConfigCreateInfoNV()
+            {
+                SType = StructureType.DeviceDiagnosticsConfigCreateInfoNV,
+                Flags = DeviceDiagnosticsConfigFlagsNV.AutomaticCheckpointsBitNV,
+                PNext = pExtendedFeatures,
+            };
+
+            pExtendedFeatures = &test;
 
             var featuresVk11 = new PhysicalDeviceVulkan11Features
             {
