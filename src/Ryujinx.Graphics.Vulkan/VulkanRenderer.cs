@@ -253,7 +253,7 @@ namespace Ryujinx.Graphics.Vulkan
 
             PhysicalDeviceExtendedDynamicState3PropertiesEXT propertiesExtendedDynamicState3 = new()
             {
-                SType = StructureType.PhysicalDeviceExtendedDynamicState3FeaturesExt,
+                SType = StructureType.PhysicalDeviceExtendedDynamicState3PropertiesExt,
             };
 
             PhysicalDeviceRobustness2FeaturesEXT featuresRobustness2 = new()
@@ -307,8 +307,8 @@ namespace Ryujinx.Graphics.Vulkan
                 featuresExtendedDynamicState3.PNext = features2.PNext;
                 features2.PNext = &featuresExtendedDynamicState3;
 
-                propertiesExtendedDynamicState3.PNext = features2.PNext;
-                features2.PNext = &propertiesExtendedDynamicState3;
+                propertiesExtendedDynamicState3.PNext = properties2.PNext;
+                properties2.PNext = &propertiesExtendedDynamicState3;
             }
 
             if (_physicalDevice.IsDeviceExtensionPresent("VK_EXT_robustness2"))
@@ -446,6 +446,7 @@ namespace Ryujinx.Graphics.Vulkan
 
             //Temporarily disable this can be added back at a later date, make it easy to re-enable. 
             featuresExtendedDynamicState2.ExtendedDynamicState2PatchControlPoints = false;
+            featuresExtendedDynamicState3.ExtendedDynamicState3PolygonMode = false;
 
             Capabilities = new HardwareCapabilities(
                 _physicalDevice.IsDeviceExtensionPresent("VK_EXT_index_type_uint8"),
