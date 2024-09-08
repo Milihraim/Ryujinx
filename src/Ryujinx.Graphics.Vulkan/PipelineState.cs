@@ -759,7 +759,7 @@ namespace Ryujinx.Graphics.Vulkan
                     RenderPass = renderPass,
                 };
 
-                if (gd.Capabilities.SupportsAttachmentFeedbackLoop && !_supportsFeedBackLoopDynamicState)
+                if (gd.Capabilities.SupportsAttachmentFeedbackLoop)
                 {
                     FeedbackLoopAspects aspects = FeedbackLoopAspects;
 
