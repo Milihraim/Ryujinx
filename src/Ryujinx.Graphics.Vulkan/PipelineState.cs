@@ -255,6 +255,7 @@ namespace Ryujinx.Graphics.Vulkan
 
         private bool _supportsExtDynamicState;
         private PhysicalDeviceExtendedDynamicState2FeaturesEXT _supportsExtDynamicState2;
+        private PhysicalDeviceExtendedDynamicState3FeaturesEXT _supportsExtDynamicState3;
         private bool _supportsFeedBackLoopDynamicState;
         private uint _blendEnables;
 
@@ -276,6 +277,7 @@ namespace Ryujinx.Graphics.Vulkan
 
             _supportsExtDynamicState = capabilities.SupportsExtendedDynamicState;
             _supportsExtDynamicState2 = capabilities.SupportsExtendedDynamicState2;
+            _supportsExtDynamicState3 = capabilities.SupportsExtendedDynamicState3;
             _supportsFeedBackLoopDynamicState = capabilities.SupportsDynamicAttachmentFeedbackLoop;
 
             if (_supportsExtDynamicState)
@@ -299,6 +301,11 @@ namespace Ryujinx.Graphics.Vulkan
                 DepthWriteEnable = false;
                 DepthCompareOp = 0;
                 StencilTestEnable = false;
+
+                if (capabilities.SupportsUnrestrictedTopology)
+                {
+                    Topology = PrimitiveTopology.PointList;
+                }
             }
 
             if (_supportsExtDynamicState2.ExtendedDynamicState2)
@@ -372,9 +379,12 @@ namespace Ryujinx.Graphics.Vulkan
 
         private void CheckCapability(VulkanRenderer gd)
         {
-            // Vendors other than NVIDIA have a bug where it enables logical operations even for float formats,
-            // so we need to force disable them here.
-            LogicOpEnable = LogicOpEnable && (gd.Vendor == Vendor.Nvidia || Internal.LogicOpsAllowed);
+            if (!_supportsExtDynamicState3.ExtendedDynamicState3LogicOpEnable)
+            {
+                // Vendors other than NVIDIA have a bug where it enables logical operations even for float formats,
+                // so we need to force disable them here.
+                LogicOpEnable = LogicOpEnable && (gd.Vendor == Vendor.Nvidia || Internal.LogicOpsAllowed);
+            }
 
             if (!_supportsExtDynamicState)
             {
@@ -411,12 +421,15 @@ namespace Ryujinx.Graphics.Vulkan
             if (_supportsExtDynamicState && (Topology != PrimitiveTopology.LineList ||
                                              Topology != PrimitiveTopology.TriangleStrip ||
                                              Topology != PrimitiveTopology.PointList ||
-                                             Topology != PrimitiveTopology.PatchList))
+                                             Topology != PrimitiveTopology.PatchList) && !gd.Capabilities.SupportsUnrestrictedTopology)
             {
                 Topology = Topology.ConvertToClass();
             }
 
-            Topology = HasTessellationControlShader ? PrimitiveTopology.PatchList : Topology;
+            if (!gd.Capabilities.SupportsUnrestrictedTopology)
+            {
+                Topology = HasTessellationControlShader ? PrimitiveTopology.PatchList : Topology;
+            }
 
             if (gd.IsMoltenVk && Internal.AttachmentIntegerFormatMask != 0)
             {
@@ -498,8 +511,12 @@ namespace Ryujinx.Graphics.Vulkan
                 var rasterizationState = new PipelineRasterizationStateCreateInfo
                 {
                     SType = StructureType.PipelineRasterizationStateCreateInfo,
-                    DepthClampEnable = DepthClampEnable,
                 };
+
+                if (!_supportsExtDynamicState3.ExtendedDynamicState3DepthClampEnable)
+                {
+                    rasterizationState.DepthClampEnable = DepthClampEnable;
+                }
 
                 if (isMoltenVk)
                 {
@@ -512,7 +529,7 @@ namespace Ryujinx.Graphics.Vulkan
                     SType = StructureType.PipelineViewportStateCreateInfo,
                 };
 
-                if (gd.Capabilities.SupportsDepthClipControl)
+                if (gd.Capabilities.SupportsDepthClipControl && !_supportsExtDynamicState3.ExtendedDynamicState3DepthClipNegativeOneToOne)
                 {
                     var viewportDepthClipControlState = new PipelineViewportDepthClipControlCreateInfoEXT
                     {
@@ -529,9 +546,17 @@ namespace Ryujinx.Graphics.Vulkan
                     SampleShadingEnable = false,
                     RasterizationSamples = TextureStorage.ConvertToSampleCountFlags(gd.Capabilities.SupportedSampleCounts, SamplesCount),
                     MinSampleShading = 1,
-                    AlphaToCoverageEnable = AlphaToCoverageEnable,
-                    AlphaToOneEnable = AlphaToOneEnable,
                 };
+
+                if (!_supportsExtDynamicState3.ExtendedDynamicState3AlphaToCoverageEnable)
+                {
+                    multisampleState.AlphaToCoverageEnable = AlphaToCoverageEnable;
+                }
+
+                if (!_supportsExtDynamicState3.ExtendedDynamicState3AlphaToOneEnable)
+                {
+                    multisampleState.AlphaToOneEnable = AlphaToOneEnable;
+                }
 
                 var depthStencilState = new PipelineDepthStencilStateCreateInfo
                 {
@@ -589,8 +614,12 @@ namespace Ryujinx.Graphics.Vulkan
                     SType = StructureType.PipelineColorBlendStateCreateInfo,
                     AttachmentCount = ColorBlendAttachmentStateCount,
                     PAttachments = pColorBlendAttachmentState,
-                    LogicOpEnable = LogicOpEnable,
                 };
+
+                if (!_supportsExtDynamicState3.ExtendedDynamicState3LogicOpEnable)
+                {
+                    colorBlendState.LogicOpEnable = LogicOpEnable;
+                }
 
                 if (!gd.Capabilities.SupportsExtendedDynamicState2.ExtendedDynamicState2LogicOp)
                 {

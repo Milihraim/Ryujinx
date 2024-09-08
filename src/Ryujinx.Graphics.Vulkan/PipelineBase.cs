@@ -90,6 +90,7 @@ namespace Ryujinx.Graphics.Vulkan
 
         private readonly bool _supportExtDynamic;
         private readonly bool _supportExtDynamic2;
+        private readonly PhysicalDeviceExtendedDynamicState3FeaturesEXT _supportExtDynamic3;
 
         private FeedbackLoopAspects _feedbackLoop;
         private bool _passWritesDepthStencil;
@@ -134,6 +135,8 @@ namespace Ryujinx.Graphics.Vulkan
             _supportExtDynamic = gd.Capabilities.SupportsExtendedDynamicState;
 
             _supportExtDynamic2 = gd.Capabilities.SupportsExtendedDynamicState2.ExtendedDynamicState2;
+
+            _supportExtDynamic3 = gd.Capabilities.SupportsExtendedDynamicState3;
 
             _newState.Initialize(gd.Capabilities);
         }
@@ -855,7 +858,14 @@ namespace Ryujinx.Graphics.Vulkan
 
         public void SetDepthClamp(bool clamp)
         {
-            _newState.DepthClampEnable = clamp;
+            if (_supportExtDynamic3.ExtendedDynamicState3DepthClampEnable)
+            {
+                DynamicState.SetDepthClampEnable(clamp);
+            }
+            else
+            {
+                _newState.DepthClampEnable = clamp;
+            }
 
             SignalStateChange();
         }
@@ -864,12 +874,19 @@ namespace Ryujinx.Graphics.Vulkan
         {
             bool newMode = mode == DepthMode.MinusOneToOne;
 
-            if (_newState.DepthMode == newMode)
+            if (_supportExtDynamic3.ExtendedDynamicState3DepthClipNegativeOneToOne && Gd.Capabilities.SupportsDepthClipControl)
             {
-                return;
+                DynamicState.SetDepthClipNegativeOnetoOne(newMode);
             }
+            else
+            {
+                if (_newState.DepthMode == newMode)
+                {
+                    return;
+                }
 
-            _newState.DepthMode = newMode;
+                _newState.DepthMode = newMode;
+            }
 
             SignalStateChange();
         }
@@ -973,7 +990,14 @@ namespace Ryujinx.Graphics.Vulkan
             // so we need to force disable them here.
             bool logicOpEnable = enable && (Gd.Vendor == Vendor.Nvidia || _newState.Internal.LogicOpsAllowed);
 
-            _newState.LogicOpEnable = enable;
+            if (_supportExtDynamic3.ExtendedDynamicState3LogicOpEnable)
+            {
+                DynamicState.SetLogicOpEnable(logicOpEnable);
+            }
+            else
+            {
+                _newState.LogicOpEnable = enable;
+            }
 
             if (Gd.Capabilities.SupportsExtendedDynamicState2.ExtendedDynamicState2LogicOp)
             {
@@ -992,9 +1016,24 @@ namespace Ryujinx.Graphics.Vulkan
 
         public void SetMultisampleState(MultisampleDescriptor multisample)
         {
-            _newState.AlphaToCoverageEnable = multisample.AlphaToCoverageEnable;
 
-            _newState.AlphaToOneEnable = multisample.AlphaToOneEnable;
+            if (_supportExtDynamic3.ExtendedDynamicState3AlphaToCoverageEnable)
+            {
+                DynamicState.SetAlphaToCoverage(multisample.AlphaToCoverageEnable);
+            }
+            else
+            {
+                _newState.AlphaToCoverageEnable = multisample.AlphaToCoverageEnable;
+            }
+
+            if (_supportExtDynamic3.ExtendedDynamicState3AlphaToOneEnable)
+            {
+                DynamicState.SetAlphaToOne(multisample.AlphaToOneEnable);
+            }
+            else
+            {
+                _newState.AlphaToOneEnable = multisample.AlphaToOneEnable;
+            }
 
             SignalStateChange();
         }
@@ -1046,7 +1085,7 @@ namespace Ryujinx.Graphics.Vulkan
 
             var vkTopology = Gd.TopologyRemap(topology).Convert();
 
-            if (_supportExtDynamic)
+            if (_supportExtDynamic && !Gd.Capabilities.SupportsUnrestrictedTopology)
             {
                 var newTopologyClass = vkTopology.ConvertToClass();
 
@@ -1055,6 +1094,10 @@ namespace Ryujinx.Graphics.Vulkan
                     _newState.Topology = vkTopology;
                 }
 
+                DynamicState.SetPrimitiveTopology(vkTopology);
+            }
+            else if (_supportExtDynamic && Gd.Capabilities.SupportsUnrestrictedTopology)
+            {
                 DynamicState.SetPrimitiveTopology(vkTopology);
             }
             else

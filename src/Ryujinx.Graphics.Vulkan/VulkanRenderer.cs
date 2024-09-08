@@ -36,6 +36,7 @@ namespace Ryujinx.Graphics.Vulkan
         internal ExtConditionalRendering ConditionalRenderingApi { get; private set; }
         internal ExtExtendedDynamicState ExtendedDynamicStateApi { get; private set; }
         internal ExtExtendedDynamicState2 ExtendedDynamicState2Api { get; private set; }
+        internal ExtExtendedDynamicState3 ExtendedDynamicState3Api { get; private set; }
         internal KhrPushDescriptor PushDescriptorApi { get; private set; }
         internal ExtTransformFeedback TransformFeedbackApi { get; private set; }
         internal KhrDrawIndirectCount DrawIndirectCountApi { get; private set; }
@@ -141,6 +142,11 @@ namespace Ryujinx.Graphics.Vulkan
                 ExtendedDynamicState2Api = extendedDynamicState2Api;
             }
 
+            if (Api.TryGetDeviceExtension(_instance.Instance, _device, out ExtExtendedDynamicState3 extendedDynamicState3Api))
+            {
+                ExtendedDynamicState3Api = extendedDynamicState3Api;
+            }
+
             if (Api.TryGetDeviceExtension(_instance.Instance, _device, out KhrPushDescriptor pushDescriptorApi))
             {
                 PushDescriptorApi = pushDescriptorApi;
@@ -240,6 +246,16 @@ namespace Ryujinx.Graphics.Vulkan
                 SType = StructureType.PhysicalDeviceExtendedDynamicState2FeaturesExt,
             };
 
+            PhysicalDeviceExtendedDynamicState3FeaturesEXT featuresExtendedDynamicState3 = new()
+            {
+                SType = StructureType.PhysicalDeviceExtendedDynamicState3FeaturesExt,
+            };
+
+            PhysicalDeviceExtendedDynamicState3PropertiesEXT propertiesExtendedDynamicState3 = new()
+            {
+                SType = StructureType.PhysicalDeviceExtendedDynamicState3FeaturesExt,
+            };
+
             PhysicalDeviceRobustness2FeaturesEXT featuresRobustness2 = new()
             {
                 SType = StructureType.PhysicalDeviceRobustness2FeaturesExt,
@@ -284,6 +300,15 @@ namespace Ryujinx.Graphics.Vulkan
             {
                 featuresExtendedDynamicState2.PNext = features2.PNext;
                 features2.PNext = &featuresExtendedDynamicState2;
+            }
+
+            if (_physicalDevice.IsDeviceExtensionPresent(ExtExtendedDynamicState3.ExtensionName))
+            {
+                featuresExtendedDynamicState3.PNext = features2.PNext;
+                features2.PNext = &featuresExtendedDynamicState3;
+
+                propertiesExtendedDynamicState3.PNext = features2.PNext;
+                features2.PNext = &propertiesExtendedDynamicState3;
             }
 
             if (_physicalDevice.IsDeviceExtensionPresent("VK_EXT_robustness2"))
@@ -439,6 +464,8 @@ namespace Ryujinx.Graphics.Vulkan
                 _physicalDevice.IsDeviceExtensionPresent(ExtConditionalRendering.ExtensionName),
                 _physicalDevice.IsDeviceExtensionPresent(ExtExtendedDynamicState.ExtensionName),
                 featuresExtendedDynamicState2,
+                propertiesExtendedDynamicState3.DynamicPrimitiveTopologyUnrestricted,
+                featuresExtendedDynamicState3,
                 _physicalDevice.PhysicalDeviceProperties.Limits.MaxTessellationPatchSize,
                 features2.Features.MultiViewport && !(IsMoltenVk && Vendor == Vendor.Amd), // Workaround for AMD on MoltenVK issue
                 featuresRobustness2.NullDescriptor || IsMoltenVk,

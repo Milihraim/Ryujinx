@@ -1,4 +1,5 @@
 using Ryujinx.Common.Memory;
+using Silk.NET.Core;
 using Silk.NET.Vulkan;
 using Silk.NET.Vulkan.Extensions.EXT;
 using System;
@@ -53,12 +54,19 @@ namespace Ryujinx.Graphics.Vulkan
         private bool _discard;
 
         private LogicOp _logicOp;
+        private bool _logicOpEnable;
 
         private uint _patchControlPoints;
 
         public PrimitiveTopology Topology;
 
         private bool _primitiveRestartEnable;
+
+        private bool _alphaToCoverageEnable;
+        private bool _alphaToOneEnable;
+        private bool _depthClipNegativeOneToOne;
+        private bool _depthClampEnable;
+        private PolygonMode _polygonMode;
 
         [Flags]
         private enum DirtyFlags
@@ -82,6 +90,12 @@ namespace Ryujinx.Graphics.Vulkan
             PrimitiveRestart = 1 << 15,
             PrimitiveTopology = 1 << 16,
             DepthBiasEnable = 1 << 17,
+            LogicOpEnable = 1 << 18,
+            AlphaToCoverage = 1 << 19,
+            AlphaToOne = 1 << 20,
+            DepthClipNegativeOnetoOne = 1 << 21,
+            DepthClampEnable = 1 << 22,
+            PolgygonMode = 1 << 23,
             Standard = Blend | DepthBias | Scissor | Stencil | Viewport | FeedbackLoop,
             Extended = CullMode | FrontFace | DepthTestBool | DepthTestCompareOp | StencilTestEnableandStencilOp | PrimitiveTopology,
             Extended2 = RasterDiscard | PrimitiveRestart | DepthBiasEnable,
@@ -238,6 +252,42 @@ namespace Ryujinx.Graphics.Vulkan
             _dirty |= DirtyFlags.LogicOp;
         }
 
+        public void SetLogicOpEnable(bool enable)
+        {
+            _logicOpEnable = enable;
+            _dirty |= DirtyFlags.LogicOpEnable;
+        }
+
+        public void SetAlphaToCoverage(bool enable)
+        {
+            _alphaToCoverageEnable = enable;
+            _dirty |= DirtyFlags.AlphaToCoverage;
+        }
+
+        public void SetAlphaToOne(bool enable)
+        {
+            _alphaToOneEnable = enable;
+            _dirty |= DirtyFlags.AlphaToOne;
+        }
+
+        public void SetDepthClipNegativeOnetoOne(bool enable)
+        {
+            _depthClipNegativeOneToOne = enable;
+            _dirty |= DirtyFlags.DepthClipNegativeOnetoOne;
+        }
+
+        public void SetDepthClampEnable(bool enable)
+        {
+            _depthClampEnable = enable;
+            _dirty |= DirtyFlags.DepthClampEnable;
+        }
+
+        public void SetPolygonMode(PolygonMode polygonMode)
+        {
+            _polygonMode = polygonMode;
+            _dirty |= DirtyFlags.PolgygonMode;
+        }
+
         public void SetPatchControlPoints(uint points)
         {
             _patchControlPoints = points;
@@ -271,6 +321,36 @@ namespace Ryujinx.Graphics.Vulkan
             if (gd.Capabilities.SupportsExtendedDynamicState2.ExtendedDynamicState2PatchControlPoints)
             {
                 _dirty |= DirtyFlags.PatchControlPoints;
+            }
+
+            if (gd.Capabilities.SupportsExtendedDynamicState3.ExtendedDynamicState3LogicOpEnable)
+            {
+                _dirty |= DirtyFlags.LogicOpEnable;
+            }
+
+            if (gd.Capabilities.SupportsExtendedDynamicState3.ExtendedDynamicState3DepthClipNegativeOneToOne)
+            {
+                _dirty |= DirtyFlags.DepthClipNegativeOnetoOne;
+            }
+
+            if (gd.Capabilities.SupportsExtendedDynamicState3.ExtendedDynamicState3AlphaToCoverageEnable)
+            {
+                _dirty |= DirtyFlags.AlphaToCoverage;
+            }
+
+            if (gd.Capabilities.SupportsExtendedDynamicState3.ExtendedDynamicState3AlphaToOneEnable)
+            {
+                _dirty |= DirtyFlags.AlphaToOne;
+            }
+
+            if (gd.Capabilities.SupportsExtendedDynamicState3.ExtendedDynamicState3DepthClampEnable)
+            {
+                _dirty |= DirtyFlags.DepthClampEnable;
+            }
+
+            if (gd.Capabilities.SupportsExtendedDynamicState3.ExtendedDynamicState3PolygonMode)
+            {
+                _dirty |= DirtyFlags.PolgygonMode;
             }
         }
 
@@ -364,6 +444,36 @@ namespace Ryujinx.Graphics.Vulkan
             if (_dirty.HasFlag(DirtyFlags.FeedbackLoop) && gd.Capabilities.SupportsDynamicAttachmentFeedbackLoop)
             {
                 RecordFeedbackLoop(gd.DynamicFeedbackLoopApi, commandBuffer);
+            }
+
+            if (_dirty.HasFlag(DirtyFlags.LogicOpEnable))
+            {
+                RecordLogicOpEnalbe(gd.ExtendedDynamicState3Api, commandBuffer);
+            }
+
+            if (_dirty.HasFlag(DirtyFlags.AlphaToCoverage))
+            {
+                RecordAlphaToCoverage(gd.ExtendedDynamicState3Api, commandBuffer);
+            }
+
+            if (_dirty.HasFlag(DirtyFlags.AlphaToOne))
+            {
+                RecordAlphaToOne(gd.ExtendedDynamicState3Api, commandBuffer);
+            }
+
+            if (_dirty.HasFlag(DirtyFlags.DepthClipNegativeOnetoOne))
+            {
+                RecordDepthClip(gd.ExtendedDynamicState3Api, commandBuffer);
+            }
+
+            if (_dirty.HasFlag(DirtyFlags.DepthClampEnable))
+            {
+                RecordDepthClamp(gd.ExtendedDynamicState3Api, commandBuffer);
+            }
+
+            if (_dirty.HasFlag(DirtyFlags.PolgygonMode))
+            {
+                RecordPolygonMode(gd.ExtendedDynamicState3Api, commandBuffer);
             }
 
             _dirty = DirtyFlags.None;
@@ -520,6 +630,11 @@ namespace Ryujinx.Graphics.Vulkan
             api.CmdSetLineWidth(commandBuffer, _lineWidth);
         }
 
+        private readonly void RecordLogicOpEnalbe(ExtExtendedDynamicState3 api, CommandBuffer commandBuffer)
+        {
+            api.CmdSetLogicOpEnable(commandBuffer, _logicOpEnable);
+        }
+
         private readonly void RecordFeedbackLoop(ExtAttachmentFeedbackLoopDynamicState api, CommandBuffer commandBuffer)
         {
             ImageAspectFlags aspects = (_feedbackLoopAspects & FeedbackLoopAspects.Color) != 0 ? ImageAspectFlags.ColorBit : 0;
@@ -530,6 +645,31 @@ namespace Ryujinx.Graphics.Vulkan
             }
 
             api.CmdSetAttachmentFeedbackLoopEnable(commandBuffer, aspects);
+        }
+
+        private readonly void RecordAlphaToCoverage(ExtExtendedDynamicState3 api, CommandBuffer commandBuffer)
+        {
+            api.CmdSetAlphaToCoverageEnable(commandBuffer, _alphaToCoverageEnable);
+        }
+
+        private readonly void RecordAlphaToOne(ExtExtendedDynamicState3 api, CommandBuffer commandBuffer)
+        {
+            api.CmdSetAlphaToOneEnable(commandBuffer, _alphaToOneEnable);
+        }
+
+        private readonly void RecordDepthClip(ExtExtendedDynamicState3 api, CommandBuffer commandBuffer)
+        {
+            api.CmdSetDepthClipNegativeOneToOne(commandBuffer, _depthClipNegativeOneToOne);
+        }
+
+        private readonly void RecordDepthClamp(ExtExtendedDynamicState3 api, CommandBuffer commandBuffer)
+        {
+            api.CmdSetDepthClampEnable(commandBuffer, _depthClampEnable);
+        }
+
+        private readonly void RecordPolygonMode(ExtExtendedDynamicState3 api, CommandBuffer commandBuffer)
+        {
+            api.CmdSetPolygonMode(commandBuffer, _polygonMode);
         }
     }
 }

@@ -175,7 +175,10 @@ namespace Ryujinx.Graphics.Vulkan
 
             pipeline.PolygonMode = PolygonMode.Fill; // Not implemented.
 
-            pipeline.Topology = gd.TopologyRemap(state.Topology).Convert();
+            if (!gd.Capabilities.SupportsUnrestrictedTopology)
+            {
+                pipeline.Topology = gd.TopologyRemap(state.Topology).Convert();
+            }
 
             if (!extendedDynamicState)
             {

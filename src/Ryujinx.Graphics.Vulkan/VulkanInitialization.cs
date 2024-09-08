@@ -24,6 +24,7 @@ namespace Ryujinx.Graphics.Vulkan
             ExtConditionalRendering.ExtensionName,
             ExtExtendedDynamicState.ExtensionName,
             ExtExtendedDynamicState2.ExtensionName,
+            ExtExtendedDynamicState3.ExtensionName,
             ExtTransformFeedback.ExtensionName,
             KhrDrawIndirectCount.ExtensionName,
             KhrPushDescriptor.ExtensionName,
@@ -321,9 +322,20 @@ namespace Ryujinx.Graphics.Vulkan
                 PNext = features2.PNext,
             };
 
+            PhysicalDeviceExtendedDynamicState3FeaturesEXT supportedFeaturesExtExtendedDynamicState3 = new()
+            {
+                SType = StructureType.PhysicalDeviceExtendedDynamicState3FeaturesExt,
+                PNext = features2.PNext,
+            };
+
             if (physicalDevice.IsDeviceExtensionPresent(ExtExtendedDynamicState2.ExtensionName))
             {
                 features2.PNext = &supportedFeaturesExtExtendedDynamicState2;
+            }
+
+            if (physicalDevice.IsDeviceExtensionPresent(ExtExtendedDynamicState3.ExtensionName))
+            {
+                features2.PNext = &supportedFeaturesExtExtendedDynamicState3;
             }
 
             PhysicalDevicePrimitiveTopologyListRestartFeaturesEXT supportedFeaturesPrimitiveTopologyListRestart = new()
@@ -500,6 +512,23 @@ namespace Ryujinx.Graphics.Vulkan
                 };
 
                 pExtendedFeatures = &featuresExtendedDynamicState2;
+            }
+
+            if (physicalDevice.IsDeviceExtensionPresent(ExtExtendedDynamicState3.ExtensionName))
+            {
+                var featuresExtendedDynamicState3 = new PhysicalDeviceExtendedDynamicState3FeaturesEXT()
+                {
+                    SType = StructureType.PhysicalDeviceExtendedDynamicState3FeaturesExt,
+                    PNext = pExtendedFeatures,
+                    ExtendedDynamicState3AlphaToCoverageEnable = supportedFeaturesExtExtendedDynamicState3.ExtendedDynamicState3AlphaToCoverageEnable,
+                    ExtendedDynamicState3AlphaToOneEnable = supportedFeaturesExtExtendedDynamicState3.ExtendedDynamicState3AlphaToOneEnable,
+                    ExtendedDynamicState3PolygonMode = supportedFeaturesExtExtendedDynamicState3.ExtendedDynamicState3PolygonMode,
+                    ExtendedDynamicState3LogicOpEnable = supportedFeaturesExtExtendedDynamicState3.ExtendedDynamicState3LogicOpEnable,
+                    ExtendedDynamicState3DepthClipNegativeOneToOne = supportedFeaturesExtExtendedDynamicState3.ExtendedDynamicState3DepthClipNegativeOneToOne,
+                    ExtendedDynamicState3DepthClampEnable = supportedFeaturesExtExtendedDynamicState3.ExtendedDynamicState3DepthClampEnable,
+                };
+
+                pExtendedFeatures = &featuresExtendedDynamicState3;
             }
 
             var featuresVk11 = new PhysicalDeviceVulkan11Features
