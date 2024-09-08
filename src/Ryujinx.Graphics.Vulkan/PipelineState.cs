@@ -465,7 +465,7 @@ namespace Ryujinx.Graphics.Vulkan
 
             // Using patches topology without a tessellation shader is invalid.
             // If we find such a case, return null pipeline to skip the draw.
-            if (Topology == PrimitiveTopology.PatchList && !HasTessellationControlShader)
+            if (Topology == PrimitiveTopology.PatchList && !HasTessellationControlShader && !gd.Capabilities.SupportsUnrestrictedTopology)
             {
                 program.AddGraphicsPipeline(ref Internal, null);
 
