@@ -704,6 +704,36 @@ namespace Ryujinx.Graphics.Vulkan
                 {
                     dynamicStates[dynamicStatesCount++] = DynamicState.AttachmentFeedbackLoopEnableExt;
                 }
+                
+                if (_supportsExtDynamicState3.ExtendedDynamicState3RasterizationSamples)
+                {
+                    dynamicStates[dynamicStatesCount++] = DynamicState.RasterizationSamplesExt;
+                }
+                
+                if (_supportsExtDynamicState3.ExtendedDynamicState3LogicOpEnable)
+                {
+                    dynamicStates[dynamicStatesCount++] = DynamicState.LogicOpEnableExt;
+                }
+                
+                if (_supportsExtDynamicState3.ExtendedDynamicState3DepthClipNegativeOneToOne)
+                {
+                    dynamicStates[dynamicStatesCount++] = DynamicState.DepthClipNegativeOneToOneExt;
+                }
+                
+                if (_supportsExtDynamicState3.ExtendedDynamicState3AlphaToCoverageEnable)
+                {
+                    dynamicStates[dynamicStatesCount++] = DynamicState.AlphaToCoverageEnableExt;
+                }
+                
+                if (_supportsExtDynamicState3.ExtendedDynamicState3AlphaToOneEnable)
+                {
+                    dynamicStates[dynamicStatesCount++] = DynamicState.AlphaToOneEnableExt;
+                }
+                
+                if (_supportsExtDynamicState3.ExtendedDynamicState3DepthClampEnable)
+                {
+                    dynamicStates[dynamicStatesCount++] = DynamicState.DepthClampEnableExt;
+                }
 
                 var pipelineDynamicStateCreateInfo = new PipelineDynamicStateCreateInfo
                 {
