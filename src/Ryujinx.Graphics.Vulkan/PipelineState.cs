@@ -324,6 +324,31 @@ namespace Ryujinx.Graphics.Vulkan
                     PatchControlPoints = 0;
                 }
             }
+
+            if (_supportsExtDynamicState3.ExtendedDynamicState3RasterizationSamples)
+            {
+                SamplesCount = 0;
+            }
+
+            if (_supportsExtDynamicState3.ExtendedDynamicState3LogicOpEnable)
+            {
+                LogicOpEnable = false;
+            }
+
+            if (_supportsExtDynamicState3.ExtendedDynamicState3AlphaToCoverageEnable)
+            {
+                AlphaToCoverageEnable = false;
+            }
+
+            if (_supportsExtDynamicState3.ExtendedDynamicState3AlphaToOneEnable)
+            {
+                AlphaToCoverageEnable = false;
+            }
+
+            if (_supportsExtDynamicState3.ExtendedDynamicState3DepthClampEnable)
+            {
+                DepthClampEnable = false;
+            }
         }
 
         public unsafe Auto<DisposablePipeline> CreateComputePipeline(
