@@ -1682,7 +1682,22 @@ namespace Ryujinx.Graphics.Vulkan
 
             _newState.ColorBlendAttachmentStateCount = (uint)(FramebufferParams.MaxColorAttachmentIndex + 1);
             _newState.HasDepthStencil = FramebufferParams.HasDepthStencil;
-            _newState.SamplesCount = FramebufferParams.AttachmentSamples.Length != 0 ? FramebufferParams.AttachmentSamples[0] : 1;
+
+            if (_supportExtDynamic3.ExtendedDynamicState3RasterizationSamples)
+            {
+                var samplesCount =
+                    TextureStorage.ConvertToSampleCountFlags(Gd.Capabilities.SupportedSampleCounts, FramebufferParams.AttachmentSamples.Length != 0
+                        ? FramebufferParams.AttachmentSamples[0]
+                        : 1);
+
+                DynamicState.SetRasterizationSamples(samplesCount);
+            }
+            else
+            {
+                _newState.SamplesCount = FramebufferParams.AttachmentSamples.Length != 0
+                    ? FramebufferParams.AttachmentSamples[0]
+                    : 1;
+            }
         }
 
         protected unsafe void CreateRenderPass()

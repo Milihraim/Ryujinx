@@ -157,6 +157,8 @@ namespace Ryujinx.Graphics.Vulkan
         {
             var extendedDynamicState2 = gd.Capabilities.SupportsExtendedDynamicState2;
             var extendedDynamicState = gd.Capabilities.SupportsExtendedDynamicState;
+            var extendedDynamicState3 = gd.Capabilities.SupportsExtendedDynamicState3;
+
 
             PipelineState pipeline = new();
             pipeline.Initialize(gd.Capabilities);
@@ -164,12 +166,25 @@ namespace Ryujinx.Graphics.Vulkan
             // It is assumed that Dynamic State is enabled when this conversion is used.
             pipeline.DepthBoundsTestEnable = false; // Not implemented.
 
-            pipeline.DepthClampEnable = state.DepthClampEnable;
+            if (!extendedDynamicState3.ExtendedDynamicState3DepthClampEnable)
+            {
+                pipeline.DepthClampEnable = state.DepthClampEnable;
+            }
 
-            pipeline.AlphaToCoverageEnable = state.AlphaToCoverageEnable;
-            pipeline.AlphaToOneEnable = state.AlphaToOneEnable;
+            if (!extendedDynamicState3.ExtendedDynamicState3AlphaToCoverageEnable)
+            {
+                pipeline.AlphaToCoverageEnable = state.AlphaToCoverageEnable;
+            }
 
-            pipeline.DepthMode = state.DepthMode == DepthMode.MinusOneToOne;
+            if (!extendedDynamicState3.ExtendedDynamicState3AlphaToOneEnable)
+            {
+                pipeline.AlphaToOneEnable = state.AlphaToOneEnable;
+            }
+
+            if (!extendedDynamicState3.ExtendedDynamicState3DepthClipNegativeOneToOne)
+            {
+                pipeline.DepthMode = state.DepthMode == DepthMode.MinusOneToOne;
+            }
 
             pipeline.HasDepthStencil = state.DepthStencilEnable;
 
@@ -232,9 +247,15 @@ namespace Ryujinx.Graphics.Vulkan
                 pipeline.PatchControlPoints = state.PatchControlPoints;
             }
 
-            pipeline.SamplesCount = (uint)state.SamplesCount;
+            if (!extendedDynamicState3.ExtendedDynamicState3RasterizationSamples)
+            {
+                pipeline.SamplesCount = (uint)state.SamplesCount;
+            }
 
-            pipeline.LogicOpEnable = state.LogicOpEnable;
+            if (!extendedDynamicState3.ExtendedDynamicState3LogicOpEnable)
+            {
+                pipeline.LogicOpEnable = state.LogicOpEnable;
+            }
 
             int vaCount = Math.Min(Constants.MaxVertexAttributes, state.VertexAttribCount);
             int vbCount = Math.Min(Constants.MaxVertexBuffers, state.VertexBufferCount);

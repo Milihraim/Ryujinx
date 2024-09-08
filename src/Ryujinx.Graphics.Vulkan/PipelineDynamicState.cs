@@ -67,6 +67,7 @@ namespace Ryujinx.Graphics.Vulkan
         private bool _depthClipNegativeOneToOne;
         private bool _depthClampEnable;
         private PolygonMode _polygonMode;
+        private SampleCountFlags _rasterizationSamples;
 
         [Flags]
         private enum DirtyFlags
@@ -96,6 +97,7 @@ namespace Ryujinx.Graphics.Vulkan
             DepthClipNegativeOnetoOne = 1 << 21,
             DepthClampEnable = 1 << 22,
             PolgygonMode = 1 << 23,
+            RasterizationSamples = 1 << 24,
             Standard = Blend | DepthBias | Scissor | Stencil | Viewport | FeedbackLoop,
             Extended = CullMode | FrontFace | DepthTestBool | DepthTestCompareOp | StencilTestEnableandStencilOp | PrimitiveTopology,
             Extended2 = RasterDiscard | PrimitiveRestart | DepthBiasEnable,
@@ -294,6 +296,12 @@ namespace Ryujinx.Graphics.Vulkan
             _dirty |= DirtyFlags.PatchControlPoints;
         }
 
+        public void SetRasterizationSamples(SampleCountFlags sampleCounts)
+        {
+            _rasterizationSamples = sampleCounts;
+            _dirty |= DirtyFlags.RasterizationSamples;
+        }
+
         public void ForceAllDirty(VulkanRenderer gd)
         {
             _dirty = DirtyFlags.Standard;
@@ -351,6 +359,11 @@ namespace Ryujinx.Graphics.Vulkan
             if (gd.Capabilities.SupportsExtendedDynamicState3.ExtendedDynamicState3PolygonMode)
             {
                 _dirty |= DirtyFlags.PolgygonMode;
+            }
+
+            if (gd.Capabilities.SupportsExtendedDynamicState3.ExtendedDynamicState3RasterizationSamples)
+            {
+                _dirty |= DirtyFlags.RasterizationSamples;
             }
         }
 
@@ -474,6 +487,11 @@ namespace Ryujinx.Graphics.Vulkan
             if (_dirty.HasFlag(DirtyFlags.PolgygonMode))
             {
                 RecordPolygonMode(gd.ExtendedDynamicState3Api, commandBuffer);
+            }
+
+            if (_dirty.HasFlag(DirtyFlags.RasterizationSamples))
+            {
+                RecordRasterizationSamples(gd.ExtendedDynamicState3Api, commandBuffer);
             }
 
             _dirty = DirtyFlags.None;
@@ -670,6 +688,11 @@ namespace Ryujinx.Graphics.Vulkan
         private readonly void RecordPolygonMode(ExtExtendedDynamicState3 api, CommandBuffer commandBuffer)
         {
             api.CmdSetPolygonMode(commandBuffer, _polygonMode);
+        }
+
+        private readonly void RecordRasterizationSamples(ExtExtendedDynamicState3 api, CommandBuffer commandBuffer)
+        {
+            api.CmdSetRasterizationSamples(commandBuffer, _rasterizationSamples);
         }
     }
 }

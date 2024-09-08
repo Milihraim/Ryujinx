@@ -526,6 +526,7 @@ namespace Ryujinx.Graphics.Vulkan
                     ExtendedDynamicState3LogicOpEnable = supportedFeaturesExtExtendedDynamicState3.ExtendedDynamicState3LogicOpEnable,
                     ExtendedDynamicState3DepthClipNegativeOneToOne = supportedFeaturesExtExtendedDynamicState3.ExtendedDynamicState3DepthClipNegativeOneToOne,
                     ExtendedDynamicState3DepthClampEnable = supportedFeaturesExtExtendedDynamicState3.ExtendedDynamicState3DepthClampEnable,
+                    ExtendedDynamicState3RasterizationSamples = supportedFeaturesExtExtendedDynamicState3.ExtendedDynamicState3RasterizationSamples,
                 };
 
                 pExtendedFeatures = &featuresExtendedDynamicState3;

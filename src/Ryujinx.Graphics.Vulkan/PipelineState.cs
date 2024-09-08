@@ -544,9 +544,14 @@ namespace Ryujinx.Graphics.Vulkan
                 {
                     SType = StructureType.PipelineMultisampleStateCreateInfo,
                     SampleShadingEnable = false,
-                    RasterizationSamples = TextureStorage.ConvertToSampleCountFlags(gd.Capabilities.SupportedSampleCounts, SamplesCount),
                     MinSampleShading = 1,
                 };
+
+                if (!_supportsExtDynamicState3.ExtendedDynamicState3RasterizationSamples)
+                {
+                    multisampleState.RasterizationSamples =
+                        TextureStorage.ConvertToSampleCountFlags(gd.Capabilities.SupportedSampleCounts, SamplesCount);
+                }
 
                 if (!_supportsExtDynamicState3.ExtendedDynamicState3AlphaToCoverageEnable)
                 {
