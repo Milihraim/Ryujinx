@@ -1,4 +1,3 @@
-using Ryujinx.Common.Logging;
 using Ryujinx.Graphics.GAL;
 using Ryujinx.Graphics.Shader;
 using Silk.NET.Vulkan;
@@ -149,7 +148,7 @@ namespace Ryujinx.Graphics.Vulkan
             TriFanToTrisPattern = new IndexBufferPattern(Gd, 3, 3, 2, new[] { int.MinValue, -1, 0 }, 1, true);
         }
 
-        public unsafe void Barrier()
+        public void Barrier()
         {
             Gd.Barriers.QueueMemoryBarrier();
         }
@@ -273,7 +272,7 @@ namespace Ryujinx.Graphics.Vulkan
             Gd.Api.CmdClearAttachments(CommandBuffer, 1, &attachment, 1, &clearRect);
         }
 
-        public unsafe void CommandBufferBarrier()
+        public void CommandBufferBarrier()
         {
             Gd.Barriers.QueueCommandBufferBarrier();
         }
@@ -589,7 +588,7 @@ namespace Ryujinx.Graphics.Vulkan
 
             var buffer = Gd.BufferManager
                 .GetBuffer(CommandBuffer, indirectBuffer.Handle, indirectBuffer.Offset, indirectBuffer.Size, false)
-                .Get(Cbs, indirectBuffer.Offset, indirectBuffer.Size, false).Value;
+                .Get(Cbs, indirectBuffer.Offset, indirectBuffer.Size).Value;
 
             if (!RecreateGraphicsPipelineIfNeeded())
             {
@@ -613,11 +612,11 @@ namespace Ryujinx.Graphics.Vulkan
 
             var buffer = Gd.BufferManager
                 .GetBuffer(CommandBuffer, indirectBuffer.Handle, indirectBuffer.Offset, indirectBuffer.Size, false)
-                .Get(Cbs, indirectBuffer.Offset, indirectBuffer.Size, false).Value;
+                .Get(Cbs, indirectBuffer.Offset, indirectBuffer.Size).Value;
 
             var countBuffer = Gd.BufferManager
                 .GetBuffer(CommandBuffer, parameterBuffer.Handle, parameterBuffer.Offset, parameterBuffer.Size, false)
-                .Get(Cbs, parameterBuffer.Offset, parameterBuffer.Size, false).Value;
+                .Get(Cbs, parameterBuffer.Offset, parameterBuffer.Size).Value;
 
             // TODO: Support quads and other unsupported topologies.
 
@@ -1571,7 +1570,7 @@ namespace Ryujinx.Graphics.Vulkan
             _descriptorSetUpdater.ForceImageDirty();
         }
 
-        public unsafe void TextureBarrier()
+        public void TextureBarrier()
         {
             Gd.Barriers.QueueTextureBarrier();
         }
@@ -1700,7 +1699,7 @@ namespace Ryujinx.Graphics.Vulkan
             }
         }
 
-        protected unsafe void CreateRenderPass()
+        protected void CreateRenderPass()
         {
             var hasFramebuffer = FramebufferParams != null;
 

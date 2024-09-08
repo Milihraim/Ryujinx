@@ -1,5 +1,4 @@
 using Ryujinx.Common.Memory;
-using Silk.NET.Core;
 using Silk.NET.Vulkan;
 using Silk.NET.Vulkan.Extensions.EXT;
 using System;
@@ -96,7 +95,7 @@ namespace Ryujinx.Graphics.Vulkan
             AlphaToOne = 1 << 20,
             DepthClipNegativeOnetoOne = 1 << 21,
             DepthClampEnable = 1 << 22,
-            PolgygonMode = 1 << 23,
+            PolygonMode = 1 << 23,
             RasterizationSamples = 1 << 24,
             Standard = Blend | DepthBias | Scissor | Stencil | Viewport | FeedbackLoop,
             Extended = CullMode | FrontFace | DepthTestBool | DepthTestCompareOp | StencilTestEnableandStencilOp | PrimitiveTopology,
@@ -193,7 +192,7 @@ namespace Ryujinx.Graphics.Vulkan
 
         public void SetViewports(ref Array16<Viewport> viewports, uint viewportsCount)
         {
-            if (!Viewports.Equals(viewports) || ViewportsCount != viewportsCount)
+            if (!Equals(Viewports, viewports) || ViewportsCount != viewportsCount)
             {
                 Viewports = viewports;
                 ViewportsCount = viewportsCount;
@@ -287,7 +286,7 @@ namespace Ryujinx.Graphics.Vulkan
         public void SetPolygonMode(PolygonMode polygonMode)
         {
             _polygonMode = polygonMode;
-            _dirty |= DirtyFlags.PolgygonMode;
+            _dirty |= DirtyFlags.PolygonMode;
         }
 
         public void SetPatchControlPoints(uint points)
@@ -358,7 +357,7 @@ namespace Ryujinx.Graphics.Vulkan
 
             if (gd.Capabilities.SupportsExtendedDynamicState3.ExtendedDynamicState3PolygonMode)
             {
-                _dirty |= DirtyFlags.PolgygonMode;
+                _dirty |= DirtyFlags.PolygonMode;
             }
 
             if (gd.Capabilities.SupportsExtendedDynamicState3.ExtendedDynamicState3RasterizationSamples)
@@ -461,7 +460,7 @@ namespace Ryujinx.Graphics.Vulkan
 
             if (_dirty.HasFlag(DirtyFlags.LogicOpEnable))
             {
-                RecordLogicOpEnalbe(gd.ExtendedDynamicState3Api, commandBuffer);
+                RecordLogicOpEnable(gd.ExtendedDynamicState3Api, commandBuffer);
             }
 
             if (_dirty.HasFlag(DirtyFlags.AlphaToCoverage))
@@ -484,7 +483,7 @@ namespace Ryujinx.Graphics.Vulkan
                 RecordDepthClamp(gd.ExtendedDynamicState3Api, commandBuffer);
             }
 
-            if (_dirty.HasFlag(DirtyFlags.PolgygonMode))
+            if (_dirty.HasFlag(DirtyFlags.PolygonMode))
             {
                 RecordPolygonMode(gd.ExtendedDynamicState3Api, commandBuffer);
             }
@@ -648,7 +647,7 @@ namespace Ryujinx.Graphics.Vulkan
             api.CmdSetLineWidth(commandBuffer, _lineWidth);
         }
 
-        private readonly void RecordLogicOpEnalbe(ExtExtendedDynamicState3 api, CommandBuffer commandBuffer)
+        private readonly void RecordLogicOpEnable(ExtExtendedDynamicState3 api, CommandBuffer commandBuffer)
         {
             api.CmdSetLogicOpEnable(commandBuffer, _logicOpEnable);
         }
