@@ -1,4 +1,3 @@
-using Ryujinx.Common.Logging;
 using Ryujinx.Common.Memory;
 using Ryujinx.Graphics.GAL;
 using Ryujinx.Graphics.Shader;
@@ -10,7 +9,6 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using CompareOp = Ryujinx.Graphics.GAL.CompareOp;
-using Format = Ryujinx.Graphics.GAL.Format;
 using FrontFace = Ryujinx.Graphics.GAL.FrontFace;
 using IndexType = Ryujinx.Graphics.GAL.IndexType;
 using PolygonMode = Ryujinx.Graphics.GAL.PolygonMode;
@@ -76,8 +74,8 @@ namespace Ryujinx.Graphics.Vulkan
         private readonly BufferState[] _transformFeedbackBuffers;
         private readonly VertexBufferState[] _vertexBuffers;
         private ulong _vertexBuffersDirty;
-        private readonly int[] _vertexBufferBindings;
         private bool _bindingsSet;
+        private bool _locationSet;
         protected Rectangle<int> ClearScissor;
 
         private readonly VertexBufferUpdater _vertexBufferUpdater;
@@ -100,6 +98,11 @@ namespace Ryujinx.Graphics.Vulkan
         private readonly PipelineColorBlendAttachmentState[] _storedBlend;
         public ulong DrawCount { get; private set; }
         public bool RenderPassActive { get; private set; }
+
+        private VertexInputAttributeDescription2EXT[] _vertexAttributeDescriptions2;
+        private VertexInputBindingDescription2EXT[] _vertexBindingDescriptions2;
+        private uint _vertexBindingDescriptionsCount;
+        private uint _vertexAttributeDescriptionsCount;
 
         public unsafe PipelineBase(VulkanRenderer gd, Device device)
         {
@@ -137,16 +140,8 @@ namespace Ryujinx.Graphics.Vulkan
 
             _supportExtDynamic2 = gd.Capabilities.SupportsExtendedDynamicState2.ExtendedDynamicState2;
 
-            _vertexBufferBindings = new int[Constants.MaxVertexBuffers];
-
-            for (int i = 0; i < Constants.MaxVertexBuffers; i++)
-            {
-                _vertexBufferBindings[i] = i + 1;
-            }
-
             _bindingsSet = false;
-
-            _newState.Internal.VertexBindingDescriptions[0] = new VertexInputBindingDescription(0, _supportExtDynamic && (!Gd.IsMoltenVk || Gd.SupportsMTL31) ? null : 0, VertexInputRate.Vertex);
+            _locationSet = false;
 
             _newState.Initialize(gd.Capabilities);
         }
@@ -159,7 +154,7 @@ namespace Ryujinx.Graphics.Vulkan
             TriFanToTrisPattern = new IndexBufferPattern(Gd, 3, 3, 2, new[] { int.MinValue, -1, 0 }, 1, true);
         }
 
-        public unsafe void Barrier()
+        public void Barrier()
         {
             Gd.Barriers.QueueMemoryBarrier();
         }
@@ -283,7 +278,7 @@ namespace Ryujinx.Graphics.Vulkan
             Gd.Api.CmdClearAttachments(CommandBuffer, 1, &attachment, 1, &clearRect);
         }
 
-        public unsafe void CommandBufferBarrier()
+        public void CommandBufferBarrier()
         {
             Gd.Barriers.QueueCommandBufferBarrier();
         }
@@ -749,7 +744,14 @@ namespace Ryujinx.Graphics.Vulkan
             {
                 if (_vertexBuffers[i].Overlaps(buffer, offset, size))
                 {
-                    _vertexBuffers[i].BindVertexBuffer(Gd, Cbs, (uint)i, ref _newState, _vertexBufferUpdater);
+                    if (Gd.Capabilities.SupportsVertexInputDynamicState)
+                    {
+                        _vertexBuffers[i].BindVertexBuffer(Gd, Cbs, (uint)i, ref _newState, _vertexBufferUpdater, ref _vertexBindingDescriptions2[i]);
+                    }
+                    else
+                    {
+                        _vertexBuffers[i].BindVertexBuffer(Gd, Cbs, (uint)i, ref _newState, _vertexBufferUpdater);
+                    }
                 }
             }
 
@@ -1352,12 +1354,39 @@ namespace Ryujinx.Graphics.Vulkan
 
         public void SetVertexAttribs(ReadOnlySpan<VertexAttribDescriptor> vertexAttribs)
         {
+            if (Gd.Capabilities.SupportsVertexInputDynamicState && !Gd.IsMoltenVk)
+            {
+                SetVertexAttribsDynamic(vertexAttribs);
+            }
+            else
+            {
+                SetVertexAttribsStatic(vertexAttribs);
+            }
+        }
+
+        private unsafe void SetVertexAttribsDynamic(ReadOnlySpan<VertexAttribDescriptor> vertexAttribs)
+        {
             var formatCapabilities = Gd.FormatCapabilities;
 
             Span<int> newVbScalarSizes = stackalloc int[Constants.MaxVertexBuffers];
 
             int count = Math.Min(Constants.MaxVertexAttributes, vertexAttribs.Length);
             uint dirtyVbSizes = 0;
+
+            if (!_locationSet || _vertexAttributeDescriptions2.Length != count)
+            {
+                _vertexAttributeDescriptions2 = new VertexInputAttributeDescription2EXT[count];
+
+                for (int i = 0; i < count; i++)
+                {
+                    _vertexAttributeDescriptions2[i] = new VertexInputAttributeDescription2EXT(location: (uint)i);
+                }
+
+                _locationSet = true;
+            }
+            
+            bool vertexAttribChanged = false;
+            bool vertexAttribCountChanged = false;
 
             for (int i = 0; i < count; i++)
             {
@@ -1371,11 +1400,11 @@ namespace Ryujinx.Graphics.Vulkan
                     dirtyVbSizes |= 1u << rawIndex;
                 }
 
-                _newState.Internal.VertexAttributeDescriptions[i] = new VertexInputAttributeDescription(
-                    (uint)i,
-                    (uint)bufferIndex,
-                    formatCapabilities.ConvertToVertexVkFormat(attribute.Format),
-                    (uint)attribute.Offset);
+                _vertexAttributeDescriptions2[i].Binding = (uint)bufferIndex;
+                _vertexAttributeDescriptions2[i].Format = formatCapabilities.ConvertToVertexVkFormat(attribute.Format);
+                _vertexAttributeDescriptions2[i].Offset = (uint)attribute.Offset;
+
+                vertexAttribChanged = true;
             }
 
             while (dirtyVbSizes != 0)
@@ -1393,21 +1422,113 @@ namespace Ryujinx.Graphics.Vulkan
                 dirtyVbSizes &= ~(1u << dirtyBit);
             }
 
-            _newState.VertexAttributeDescriptionsCount = (uint)count;
-            SignalStateChange();
+            if (_vertexAttributeDescriptionsCount != (uint)count)
+            {
+                _vertexAttributeDescriptionsCount = (uint)count;
+                vertexAttribCountChanged = true;
+            }
+            
+            if (vertexAttribCountChanged || vertexAttribChanged)
+            {
+                DynamicState.SetVertexInput(_vertexBindingDescriptions2, _vertexBindingDescriptionsCount, _vertexAttributeDescriptions2, _vertexAttributeDescriptionsCount);
+            }
+        }
+
+        private void SetVertexAttribsStatic(ReadOnlySpan<VertexAttribDescriptor> vertexAttribs)
+        {
+            var formatCapabilities = Gd.FormatCapabilities;
+
+            Span<int> newVbScalarSizes = stackalloc int[Constants.MaxVertexBuffers];
+
+            int count = Math.Min(Constants.MaxVertexAttributes, vertexAttribs.Length);
+            uint dirtyVbSizes = 0;
+
+            if (!_locationSet)
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    _newState.Internal.VertexAttributeDescriptions[i] = new VertexInputAttributeDescription(location: (uint)i);
+                }
+
+                _locationSet = true;
+            }
+            
+            bool vertexAttribChanged = false;
+            bool vertexAttribCountChanged = false;
+
+            for (int i = 0; i < count; i++)
+            {
+                var attribute = vertexAttribs[i];
+                var rawIndex = attribute.BufferIndex;
+                var bufferIndex = attribute.IsZero ? 0 : rawIndex + 1;
+
+                if (!attribute.IsZero)
+                {
+                    newVbScalarSizes[rawIndex] = Math.Max(newVbScalarSizes[rawIndex], attribute.Format.GetScalarSize());
+                    dirtyVbSizes |= 1u << rawIndex;
+                }
+
+                _newState.Internal.VertexAttributeDescriptions[i].Binding = (uint)bufferIndex;
+                _newState.Internal.VertexAttributeDescriptions[i].Format = formatCapabilities.ConvertToVertexVkFormat(attribute.Format);
+                _newState.Internal.VertexAttributeDescriptions[i].Offset = (uint)attribute.Offset;
+
+                vertexAttribChanged = true;
+            }
+
+            while (dirtyVbSizes != 0)
+            {
+                int dirtyBit = BitOperations.TrailingZeroCount(dirtyVbSizes);
+
+                ref var buffer = ref _vertexBuffers[dirtyBit + 1];
+
+                if (buffer.AttributeScalarAlignment != newVbScalarSizes[dirtyBit])
+                {
+                    _vertexBuffersDirty |= 1UL << (dirtyBit + 1);
+                    buffer.AttributeScalarAlignment = newVbScalarSizes[dirtyBit];
+                }
+
+                dirtyVbSizes &= ~(1u << dirtyBit);
+            }
+
+            if (_newState.VertexAttributeDescriptionsCount != (uint)count)
+            {
+                _newState.VertexAttributeDescriptionsCount = (uint)count;
+                vertexAttribCountChanged = true;
+            }
+            
+            if (vertexAttribCountChanged || vertexAttribChanged)
+            {
+                SignalStateChange();
+            }
         }
 
         public void SetVertexBuffers(ReadOnlySpan<VertexBufferDescriptor> vertexBuffers)
+        {
+            if (Gd.Capabilities.SupportsVertexInputDynamicState && !Gd.IsMoltenVk)
+            {
+                SetVertexBuffersDynamic(vertexBuffers);
+            }
+            else
+            {
+                SetVertexBuffersStatic(vertexBuffers);
+            }
+        }
+
+        private unsafe void SetVertexBuffersDynamic(ReadOnlySpan<VertexBufferDescriptor> vertexBuffers)
         {
             int count = Math.Min(Constants.MaxVertexBuffers, vertexBuffers.Length);
 
             int validCount = 1;
 
-            if (!_bindingsSet)
+            if (!_bindingsSet || _vertexBindingDescriptions2.Length != count)
             {
-                for (int i = 0; i < count; i++)
+                _vertexBindingDescriptions2 = new VertexInputBindingDescription2EXT[count];
+
+                _vertexBindingDescriptions2[0] = new VertexInputBindingDescription2EXT(StructureType.VertexInputBindingDescription2Ext, null, 0, 0, VertexInputRate.Vertex);
+
+                for (int i = 1; i < count; i++)
                 {
-                    _newState.Internal.VertexBindingDescriptions[_vertexBufferBindings[i]] = new VertexInputBindingDescription((uint)_vertexBufferBindings[i]);
+                    _vertexBindingDescriptions2[i] = new VertexInputBindingDescription2EXT(binding: (uint)i);
                 }
 
                 _bindingsSet = true;
@@ -1435,7 +1556,124 @@ namespace Ryujinx.Graphics.Vulkan
 
                     if (vb != null)
                     {
-                        //int binding = _vertexBufferBindings[i];
+                        int descriptorIndex = validCount++;
+
+                        if (_vertexBindingDescriptions2[descriptorIndex].InputRate != inputRate || _vertexBindingDescriptions2[descriptorIndex].Stride != vertexBuffer.Stride)
+                        {
+                            _vertexBindingDescriptions2[descriptorIndex].Stride = (uint)vertexBuffer.Stride;
+                            _vertexBindingDescriptions2[descriptorIndex].InputRate = inputRate;
+                            vertexBindingDescriptionChanged = true;
+                        }
+
+                        int vbSize = vertexBuffer.Buffer.Size;
+
+                        if (Gd.Vendor == Vendor.Amd && !Gd.IsMoltenVk && vertexBuffer.Stride > 0)
+                        {
+                            // AMD has a bug where if offset + stride * count is greater than
+                            // the size, then the last attribute will have the wrong value.
+                            // As a workaround, simply use the full buffer size.
+                            int remainder = vbSize % vertexBuffer.Stride;
+                            if (remainder != 0)
+                            {
+                                vbSize += vertexBuffer.Stride - remainder;
+                            }
+                        }
+
+                        ref var buffer = ref _vertexBuffers[descriptorIndex];
+                        int oldScalarAlign = buffer.AttributeScalarAlignment;
+
+                        if (Gd.Capabilities.VertexBufferAlignment < 2 &&
+                            (vertexBuffer.Stride % FormatExtensions.MaxBufferFormatScalarSize) == 0)
+                        {
+                            if (!buffer.Matches(vb, descriptorIndex, vertexBuffer.Buffer.Offset, vbSize, vertexBuffer.Stride))
+                            {
+                                buffer.Dispose();
+
+                                buffer = new VertexBufferState(
+                                    vb,
+                                    descriptorIndex,
+                                    vertexBuffer.Buffer.Offset,
+                                    vbSize,
+                                    vertexBuffer.Stride);
+
+                                buffer.BindVertexBuffer(Gd, Cbs, (uint)descriptorIndex, ref _newState, _vertexBufferUpdater, ref _vertexBindingDescriptions2[i]);
+                            }
+                        }
+                        else
+                        {
+                            // May need to be rewritten. Bind this buffer before draw.
+
+                            buffer.Dispose();
+
+                            buffer = new VertexBufferState(
+                                vertexBuffer.Buffer.Handle,
+                                descriptorIndex,
+                                vertexBuffer.Buffer.Offset,
+                                vbSize,
+                                vertexBuffer.Stride);
+
+                            _vertexBuffersDirty |= 1UL << descriptorIndex;
+                        }
+
+                        buffer.AttributeScalarAlignment = oldScalarAlign;
+                    }
+                }
+            }
+
+            _vertexBufferUpdater.Commit(Cbs);
+
+            if (_vertexBindingDescriptionsCount != validCount)
+            {
+                _vertexBindingDescriptionsCount = (uint)validCount;
+                vertexDescriptionCountChanged = true;
+            }
+            
+            if (vertexDescriptionCountChanged || vertexBindingDescriptionChanged)
+            {
+                DynamicState.SetVertexInput(_vertexBindingDescriptions2, _vertexBindingDescriptionsCount, _vertexAttributeDescriptions2, _vertexAttributeDescriptionsCount);
+            }
+        }
+
+        private void SetVertexBuffersStatic(ReadOnlySpan<VertexBufferDescriptor> vertexBuffers)
+        {
+            int count = Math.Min(Constants.MaxVertexBuffers, vertexBuffers.Length);
+
+            int validCount = 1;
+
+            if (!_bindingsSet)
+            {
+                _newState.Internal.VertexBindingDescriptions[0] = new VertexInputBindingDescription(0, _supportExtDynamic && (!Gd.IsMoltenVk || Gd.SupportsMTL31) ? null : 0, VertexInputRate.Vertex);
+
+                for (int i = 1; i < count; i++)
+                {
+                    _newState.Internal.VertexBindingDescriptions[i] = new VertexInputBindingDescription((uint)i);
+                }
+
+                _bindingsSet = true;
+            }
+
+            BufferHandle lastHandle = default;
+            Auto<DisposableBuffer> lastBuffer = default;
+            bool vertexBindingDescriptionChanged = false;
+            bool vertexDescriptionCountChanged = false;
+
+            for (int i = 0; i < count; i++)
+            {
+                var vertexBuffer = vertexBuffers[i];
+
+                // TODO: Support divisor > 1
+                var inputRate = vertexBuffer.Divisor != 0 ? VertexInputRate.Instance : VertexInputRate.Vertex;
+
+                if (vertexBuffer.Buffer.Handle != BufferHandle.Null)
+                {
+                    Auto<DisposableBuffer> vb = (vertexBuffer.Buffer.Handle == lastHandle) ? lastBuffer :
+                        Gd.BufferManager.GetBuffer(CommandBuffer, vertexBuffer.Buffer.Handle, false);
+
+                    lastHandle = vertexBuffer.Buffer.Handle;
+                    lastBuffer = vb;
+
+                    if (vb != null)
+                    {
                         int descriptorIndex = validCount++;
 
                         if (_supportExtDynamic && (!Gd.IsMoltenVk || Gd.SupportsMTL31))
@@ -1472,7 +1710,7 @@ namespace Ryujinx.Graphics.Vulkan
                             }
                         }
 
-                        ref var buffer = ref _vertexBuffers[_vertexBufferBindings[i]];
+                        ref var buffer = ref _vertexBuffers[descriptorIndex];
                         int oldScalarAlign = buffer.AttributeScalarAlignment;
 
                         if (Gd.Capabilities.VertexBufferAlignment < 2 &&
@@ -1489,7 +1727,7 @@ namespace Ryujinx.Graphics.Vulkan
                                     vbSize,
                                     vertexBuffer.Stride);
 
-                                buffer.BindVertexBuffer(Gd, Cbs, (uint)_vertexBufferBindings[i], ref _newState, _vertexBufferUpdater);
+                                buffer.BindVertexBuffer(Gd, Cbs, (uint)descriptorIndex, ref _newState, _vertexBufferUpdater);
                             }
                         }
                         else
@@ -1505,7 +1743,7 @@ namespace Ryujinx.Graphics.Vulkan
                                 vbSize,
                                 vertexBuffer.Stride);
 
-                            _vertexBuffersDirty |= 1UL << _vertexBufferBindings[i];
+                            _vertexBuffersDirty |= 1UL << descriptorIndex;
                         }
 
                         buffer.AttributeScalarAlignment = oldScalarAlign;
@@ -1869,8 +2107,14 @@ namespace Ryujinx.Graphics.Vulkan
                 {
                     int i = BitOperations.TrailingZeroCount(_vertexBuffersDirty);
 
-                    _vertexBuffers[i].BindVertexBuffer(Gd, Cbs, (uint)i, ref _newState, _vertexBufferUpdater);
-
+                    if (Gd.Capabilities.SupportsVertexInputDynamicState)
+                    {
+                        _vertexBuffers[i].BindVertexBuffer(Gd, Cbs, (uint)i, ref _newState, _vertexBufferUpdater, ref _vertexBindingDescriptions2[i]);
+                    }
+                    else
+                    {
+                        _vertexBuffers[i].BindVertexBuffer(Gd, Cbs, (uint)i, ref _newState, _vertexBufferUpdater);
+                    }
                     _vertexBuffersDirty &= ~(1UL << i);
                 }
 

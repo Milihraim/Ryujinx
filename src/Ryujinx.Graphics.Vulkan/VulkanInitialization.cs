@@ -24,6 +24,7 @@ namespace Ryujinx.Graphics.Vulkan
             ExtConditionalRendering.ExtensionName,
             ExtExtendedDynamicState.ExtensionName,
             ExtExtendedDynamicState2.ExtensionName,
+            ExtVertexInputDynamicState.ExtensionName,
             ExtTransformFeedback.ExtensionName,
             KhrDrawIndirectCount.ExtensionName,
             KhrPushDescriptor.ExtensionName,
@@ -326,6 +327,18 @@ namespace Ryujinx.Graphics.Vulkan
                 features2.PNext = &supportedFeaturesExtExtendedDynamicState2;
             }
 
+            PhysicalDeviceVertexInputDynamicStateFeaturesEXT supportedFeaturesVertexInputDynamicState = new()
+            {
+                SType = StructureType.PhysicalDeviceVertexInputDynamicStateFeaturesExt,
+                PNext = features2.PNext,
+            };
+
+            if (physicalDevice.IsDeviceExtensionPresent(ExtVertexInputDynamicState.ExtensionName))
+            {
+                features2.PNext = &supportedFeaturesVertexInputDynamicState;
+            }
+
+
             PhysicalDevicePrimitiveTopologyListRestartFeaturesEXT supportedFeaturesPrimitiveTopologyListRestart = new()
             {
                 SType = StructureType.PhysicalDevicePrimitiveTopologyListRestartFeaturesExt,
@@ -498,6 +511,18 @@ namespace Ryujinx.Graphics.Vulkan
                 };
 
                 pExtendedFeatures = &featuresExtendedDynamicState2;
+            }
+
+            if (physicalDevice.IsDeviceExtensionPresent(ExtVertexInputDynamicState.ExtensionName))
+            {
+                var featuresVertexInputDynamicState = new PhysicalDeviceVertexInputDynamicStateFeaturesEXT()
+                {
+                    SType = StructureType.PhysicalDeviceVertexInputDynamicStateFeaturesExt,
+                    PNext = pExtendedFeatures,
+                    VertexInputDynamicState = supportedFeaturesVertexInputDynamicState.VertexInputDynamicState,
+                };
+
+                pExtendedFeatures = &featuresVertexInputDynamicState;
             }
 
             var featuresVk11 = new PhysicalDeviceVulkan11Features

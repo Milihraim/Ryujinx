@@ -56,6 +56,11 @@ namespace Ryujinx.Graphics.Vulkan
 
         private uint _patchControlPoints;
 
+        private VertexInputBindingDescription2EXT[] _vertexInputBindingDescription2;
+        private VertexInputAttributeDescription2EXT[] _vertexInputAttributeDescription2;
+        private uint _vertexInputBindignsDescriptionCount;
+        private uint _vertexInputAtrributesDescriptionCount;
+
         public PrimitiveTopology Topology;
 
         private bool _primitiveRestartEnable;
@@ -82,6 +87,7 @@ namespace Ryujinx.Graphics.Vulkan
             PrimitiveRestart = 1 << 15,
             PrimitiveTopology = 1 << 16,
             DepthBiasEnable = 1 << 17,
+            VertexInput = 1 << 18,
             Standard = Blend | DepthBias | Scissor | Stencil | Viewport,
             Extended = CullMode | FrontFace | DepthTestBool | DepthTestCompareOp | StencilTestEnableAndStencilOp | PrimitiveTopology,
             Extended2 = RasterDiscard | PrimitiveRestart | DepthBiasEnable,
@@ -254,6 +260,15 @@ namespace Ryujinx.Graphics.Vulkan
             _dirty |= DirtyFlags.PatchControlPoints;
         }
 
+        public void SetVertexInput(VertexInputBindingDescription2EXT[] vertexInputBinding, uint vertexInputDescriptionCount, VertexInputAttributeDescription2EXT[] vertexInputAttribute, uint VertexInputAttributeDescriptionCount)
+        {
+            _vertexInputBindingDescription2 = vertexInputBinding;
+            _vertexInputBindignsDescriptionCount = vertexInputDescriptionCount;
+            _vertexInputAttributeDescription2 = vertexInputAttribute;
+            _vertexInputAtrributesDescriptionCount = VertexInputAttributeDescriptionCount;
+            _dirty |= DirtyFlags.VertexInput;
+        }
+
         public void ForceAllDirty(VulkanRenderer gd)
         {
             _dirty = DirtyFlags.Standard;
@@ -286,6 +301,11 @@ namespace Ryujinx.Graphics.Vulkan
             if (gd.Capabilities.SupportsDynamicAttachmentFeedbackLoop)
             {
                 _dirty |= DirtyFlags.FeedbackLoop;
+            }
+
+            if (gd.Capabilities.SupportsVertexInputDynamicState)
+            {
+                _dirty |= DirtyFlags.VertexInput;
             }
         }
 
@@ -363,6 +383,9 @@ namespace Ryujinx.Graphics.Vulkan
                         break;
                     case DirtyFlags.DepthBiasEnable:
                         RecordDepthBiasEnable(extendedState2Api, commandBuffer);
+                        break;
+                    case DirtyFlags.VertexInput:
+                        RecordVertexInput(gd.ExtendedVertexInputApi, commandBuffer);
                         break;
                 }
 
@@ -525,6 +548,11 @@ namespace Ryujinx.Graphics.Vulkan
             }
 
             api.CmdSetAttachmentFeedbackLoopEnable(commandBuffer, aspects);
+        }
+
+        private readonly void RecordVertexInput(ExtVertexInputDynamicState api, CommandBuffer commandBuffer)
+        {
+            api.CmdSetVertexInput(commandBuffer, _vertexInputBindignsDescriptionCount, _vertexInputBindingDescription2, _vertexInputAtrributesDescriptionCount, _vertexInputAttributeDescription2);
         }
     }
 }

@@ -233,55 +233,59 @@ namespace Ryujinx.Graphics.Vulkan
 
             pipeline.LogicOpEnable = state.LogicOpEnable;
 
-            int vaCount = Math.Min(Constants.MaxVertexAttributes, state.VertexAttribCount);
-            int vbCount = Math.Min(Constants.MaxVertexBuffers, state.VertexBufferCount);
-
-            Span<int> vbScalarSizes = stackalloc int[vbCount];
-
-            for (int i = 0; i < vaCount; i++)
+            if (!gd.Capabilities.SupportsVertexInputDynamicState)
             {
-                var attribute = state.VertexAttribs[i];
-                var bufferIndex = attribute.IsZero ? 0 : attribute.BufferIndex + 1;
+                int vaCount = Math.Min(Constants.MaxVertexAttributes, state.VertexAttribCount);
+                int vbCount = Math.Min(Constants.MaxVertexBuffers, state.VertexBufferCount);
 
-                pipeline.Internal.VertexAttributeDescriptions[i] = new VertexInputAttributeDescription(
-                    (uint)i,
-                    (uint)bufferIndex,
-                    gd.FormatCapabilities.ConvertToVertexVkFormat(attribute.Format),
-                    (uint)attribute.Offset);
+                Span<int> vbScalarSizes = stackalloc int[vbCount];
 
-                if (!attribute.IsZero && bufferIndex < vbCount)
+                for (int i = 0; i < vaCount; i++)
                 {
-                    vbScalarSizes[bufferIndex - 1] = Math.Max(attribute.Format.GetScalarSize(), vbScalarSizes[bufferIndex - 1]);
-                }
-            }
+                    var attribute = state.VertexAttribs[i];
+                    var bufferIndex = attribute.IsZero ? 0 : attribute.BufferIndex + 1;
 
-            int descriptorIndex = 1;
-            pipeline.Internal.VertexBindingDescriptions[0] = new VertexInputBindingDescription(0, extendedDynamicState && (!gd.IsMoltenVk || gd.SupportsMTL31) ? null : 0, VertexInputRate.Vertex);
+                    pipeline.Internal.VertexAttributeDescriptions[i] = new VertexInputAttributeDescription(
+                        (uint)i,
+                        (uint)bufferIndex,
+                        gd.FormatCapabilities.ConvertToVertexVkFormat(attribute.Format),
+                        (uint)attribute.Offset);
 
-            for (int i = 0; i < vbCount; i++)
-            {
-                var vertexBuffer = state.VertexBuffers[i];
-
-                if (vertexBuffer.Enable)
-                {
-                    var inputRate = vertexBuffer.Divisor != 0 ? VertexInputRate.Instance : VertexInputRate.Vertex;
-
-                    int alignedStride = vertexBuffer.Stride;
-
-                    if (gd.NeedsVertexBufferAlignment(vbScalarSizes[i], out int alignment))
+                    if (!attribute.IsZero && bufferIndex < vbCount)
                     {
-                        alignedStride = BitUtils.AlignUp(vertexBuffer.Stride, alignment);
+                        vbScalarSizes[bufferIndex - 1] = Math.Max(attribute.Format.GetScalarSize(), vbScalarSizes[bufferIndex - 1]);
                     }
-
-                    // TODO: Support divisor > 1
-                    pipeline.Internal.VertexBindingDescriptions[descriptorIndex++] = new VertexInputBindingDescription(
-                        (uint)i + 1,
-                        extendedDynamicState && (!gd.IsMoltenVk || gd.SupportsMTL31) ? null : (uint)alignedStride,
-                        inputRate);
                 }
-            }
 
-            pipeline.VertexBindingDescriptionsCount = (uint)descriptorIndex;
+                int descriptorIndex = 1;
+                pipeline.Internal.VertexBindingDescriptions[0] = new VertexInputBindingDescription(0, extendedDynamicState && (!gd.IsMoltenVk || gd.SupportsMTL31) ? null : 0, VertexInputRate.Vertex);
+
+                for (int i = 0; i < vbCount; i++)
+                {
+                    var vertexBuffer = state.VertexBuffers[i];
+
+                    if (vertexBuffer.Enable)
+                    {
+                        var inputRate = vertexBuffer.Divisor != 0 ? VertexInputRate.Instance : VertexInputRate.Vertex;
+
+                        int alignedStride = vertexBuffer.Stride;
+
+                        if (gd.NeedsVertexBufferAlignment(vbScalarSizes[i], out int alignment))
+                        {
+                            alignedStride = BitUtils.AlignUp(vertexBuffer.Stride, alignment);
+                        }
+
+                        // TODO: Support divisor > 1
+                        pipeline.Internal.VertexBindingDescriptions[descriptorIndex++] = new VertexInputBindingDescription(
+                            (uint)i + 1,
+                            extendedDynamicState && (!gd.IsMoltenVk || gd.SupportsMTL31) ? null : (uint)alignedStride,
+                            inputRate);
+                    }
+                }
+
+                pipeline.VertexBindingDescriptionsCount = (uint)descriptorIndex;
+                pipeline.VertexAttributeDescriptionsCount = (uint)Math.Min(Constants.MaxVertexAttributes, state.VertexAttribCount);
+            }
 
             // NOTE: Viewports, Scissors are dynamic.
 
@@ -335,7 +339,6 @@ namespace Ryujinx.Graphics.Vulkan
             }
 
             pipeline.ColorBlendAttachmentStateCount = (uint)(maxColorAttachmentIndex + 1);
-            pipeline.VertexAttributeDescriptionsCount = (uint)Math.Min(Constants.MaxVertexAttributes, state.VertexAttribCount);
             pipeline.Internal.AttachmentIntegerFormatMask = attachmentIntegerFormatMask;
             pipeline.Internal.LogicOpsAllowed = attachmentCount == 0 || !allFormatsFloatOrSrgb;
 

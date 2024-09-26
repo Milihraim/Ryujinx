@@ -32,6 +32,7 @@ namespace Ryujinx.Graphics.Vulkan
         public readonly bool SupportsConditionalRendering;
         public readonly bool SupportsExtendedDynamicState;
         public readonly PhysicalDeviceExtendedDynamicState2FeaturesEXT SupportsExtendedDynamicState2;
+        public readonly bool SupportsVertexInputDynamicState;
         public readonly bool SupportsMultiView;
         public readonly bool SupportsNullDescriptors;
         public readonly bool SupportsPushDescriptors;
@@ -75,6 +76,7 @@ namespace Ryujinx.Graphics.Vulkan
             bool supportsConditionalRendering,
             bool supportsExtendedDynamicState,
             PhysicalDeviceExtendedDynamicState2FeaturesEXT supportsExtendedDynamicState2,
+            bool supportsVertexInputDynamicState,
             uint maxTessellationPatchSize,
             bool supportsMultiView,
             bool supportsNullDescriptors,
@@ -117,6 +119,7 @@ namespace Ryujinx.Graphics.Vulkan
             SupportsConditionalRendering = supportsConditionalRendering;
             SupportsExtendedDynamicState = supportsExtendedDynamicState;
             SupportsExtendedDynamicState2 = supportsExtendedDynamicState2;
+            SupportsVertexInputDynamicState = supportsVertexInputDynamicState;
             MaxTessellationPatchSize = maxTessellationPatchSize;
             SupportsMultiView = supportsMultiView;
             SupportsNullDescriptors = supportsNullDescriptors;

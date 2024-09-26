@@ -1,4 +1,5 @@
 using Ryujinx.Graphics.GAL;
+using Silk.NET.Vulkan;
 
 namespace Ryujinx.Graphics.Vulkan
 {
@@ -48,6 +49,70 @@ namespace Ryujinx.Graphics.Vulkan
             AttributeScalarAlignment = 1;
         }
 
+        public void BindVertexBuffer(VulkanRenderer gd, CommandBufferScoped cbs, uint binding, ref PipelineState state, VertexBufferUpdater updater, ref VertexInputBindingDescription2EXT vertexInputBindingDescription2Ext)
+        {
+            var autoBuffer = _buffer;
+
+            if (_handle != BufferHandle.Null)
+            {
+                // May need to restride the vertex buffer.
+
+                if (gd.NeedsVertexBufferAlignment(AttributeScalarAlignment, out int alignment) && (_stride % alignment) != 0)
+                {
+                    autoBuffer = gd.BufferManager.GetAlignedVertexBuffer(cbs, _handle, _offset, _size, _stride, alignment);
+
+                    if (autoBuffer != null)
+                    {
+                        int stride = (_stride + (alignment - 1)) & -alignment;
+                        int newSize = (_size / _stride) * stride;
+
+                        var buffer = autoBuffer.Get(cbs, 0, newSize).Value;
+
+                        updater.BindVertexBuffer(cbs, binding, buffer, 0, (ulong)newSize, (ulong)stride);
+
+                        _buffer = autoBuffer;
+
+                        if (!gd.Capabilities.SupportsExtendedDynamicState && !gd.Capabilities.SupportsVertexInputDynamicState)
+                        {
+                            state.Internal.VertexBindingDescriptions[DescriptorIndex].Stride = (uint)stride;
+                        }
+                        else if (gd.Capabilities.SupportsVertexInputDynamicState)
+                        {
+                            vertexInputBindingDescription2Ext.Stride = (uint)stride;
+                        }
+                    }
+
+                    return;
+                }
+
+                autoBuffer = gd.BufferManager.GetBuffer(cbs.CommandBuffer, _handle, false, out int size);
+
+                if (!gd.Capabilities.SupportsExtendedDynamicState && !gd.Capabilities.SupportsVertexInputDynamicState)
+                {
+                    // The original stride must be reapplied in case it was rewritten.
+                    state.Internal.VertexBindingDescriptions[DescriptorIndex].Stride = (uint)_stride;
+                }
+                else if (gd.Capabilities.SupportsVertexInputDynamicState)
+                {
+                    vertexInputBindingDescription2Ext.Stride = (uint)_stride;
+                }
+                
+                if (_offset >= size)
+                {
+                    autoBuffer = null;
+                }
+            }
+
+            if (autoBuffer != null)
+            {
+                int offset = _offset;
+                bool mirrorable = _size <= VertexBufferMaxMirrorable;
+                var buffer = mirrorable ? autoBuffer.GetMirrorable(cbs, ref offset, _size, out _).Value : autoBuffer.Get(cbs, offset, _size).Value;
+
+                updater.BindVertexBuffer(cbs, binding, buffer, (ulong)offset, (ulong)_size, (ulong)_stride);
+            }
+        }
+        
         public void BindVertexBuffer(VulkanRenderer gd, CommandBufferScoped cbs, uint binding, ref PipelineState state, VertexBufferUpdater updater)
         {
             var autoBuffer = _buffer;
@@ -71,7 +136,7 @@ namespace Ryujinx.Graphics.Vulkan
 
                         _buffer = autoBuffer;
 
-                        if (!gd.Capabilities.SupportsExtendedDynamicState)
+                        if (!gd.Capabilities.SupportsExtendedDynamicState && !gd.Capabilities.SupportsVertexInputDynamicState)
                         {
                             state.Internal.VertexBindingDescriptions[DescriptorIndex].Stride = (uint)stride;
                         }
@@ -82,12 +147,12 @@ namespace Ryujinx.Graphics.Vulkan
 
                 autoBuffer = gd.BufferManager.GetBuffer(cbs.CommandBuffer, _handle, false, out int size);
 
-                if (!gd.Capabilities.SupportsExtendedDynamicState)
+                if (!gd.Capabilities.SupportsExtendedDynamicState && !gd.Capabilities.SupportsVertexInputDynamicState)
                 {
                     // The original stride must be reapplied in case it was rewritten.
                     state.Internal.VertexBindingDescriptions[DescriptorIndex].Stride = (uint)_stride;
                 }
-
+                
                 if (_offset >= size)
                 {
                     autoBuffer = null;
@@ -103,6 +168,7 @@ namespace Ryujinx.Graphics.Vulkan
                 updater.BindVertexBuffer(cbs, binding, buffer, (ulong)offset, (ulong)_size, (ulong)_stride);
             }
         }
+
 
         public readonly bool BoundEquals(Auto<DisposableBuffer> buffer)
         {

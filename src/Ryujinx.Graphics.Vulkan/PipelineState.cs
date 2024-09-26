@@ -7,7 +7,7 @@ namespace Ryujinx.Graphics.Vulkan
 {
     struct PipelineState : IDisposable
     {
-        private const int MaxDynamicStatesCount = 23;
+        private const int MaxDynamicStatesCount = 24;
 
         public PipelineUid Internal;
 
@@ -473,14 +473,19 @@ namespace Ryujinx.Graphics.Vulkan
             fixed (VertexInputBindingDescription* pVertexBindingDescriptions = &Internal.VertexBindingDescriptions[0])
             fixed (PipelineColorBlendAttachmentState* pColorBlendAttachmentState = &Internal.ColorBlendAttachmentState[0])
             {
-                var vertexInputState = new PipelineVertexInputStateCreateInfo
+                PipelineVertexInputStateCreateInfo vertexInputState;
+
+                if (!gd.Capabilities.SupportsVertexInputDynamicState)
                 {
-                    SType = StructureType.PipelineVertexInputStateCreateInfo,
-                    VertexAttributeDescriptionCount = VertexAttributeDescriptionsCount,
-                    PVertexAttributeDescriptions = isMoltenVk && !_supportsExtDynamicState ? pVertexAttributeDescriptions2 : pVertexAttributeDescriptions,
-                    VertexBindingDescriptionCount = VertexBindingDescriptionsCount,
-                    PVertexBindingDescriptions = pVertexBindingDescriptions,
-                };
+                    vertexInputState = new PipelineVertexInputStateCreateInfo
+                    {
+                        SType = StructureType.PipelineVertexInputStateCreateInfo,
+                        VertexAttributeDescriptionCount = VertexAttributeDescriptionsCount,
+                        PVertexAttributeDescriptions = isMoltenVk && !_supportsExtDynamicState ? pVertexAttributeDescriptions2 : pVertexAttributeDescriptions,
+                        VertexBindingDescriptionCount = VertexBindingDescriptionsCount,
+                        PVertexBindingDescriptions = pVertexBindingDescriptions,
+                    };
+                }
 
                 var inputAssemblyState = new PipelineInputAssemblyStateCreateInfo
                 {
@@ -658,6 +663,11 @@ namespace Ryujinx.Graphics.Vulkan
                     }
                 }
 
+                if (gd.Capabilities.SupportsVertexInputDynamicState)
+                {
+                    dynamicStates[dynamicStatesCount++] = DynamicState.VertexInputExt;
+                }
+
                 PipelineCreateFlags pipelineCreateFlags = 0;
 
                 if (gd.Capabilities.SupportsAttachmentFeedbackLoop && !_supportsFeedBackLoopDynamicState)
@@ -694,7 +704,6 @@ namespace Ryujinx.Graphics.Vulkan
                     StageCount = StagesCount,
                     Flags = pipelineCreateFlags,
                     PStages = Stages.Pointer,
-                    PVertexInputState = &vertexInputState,
                     PInputAssemblyState = &inputAssemblyState,
                     PViewportState = &viewportState,
                     PRasterizationState = &rasterizationState,
@@ -705,6 +714,11 @@ namespace Ryujinx.Graphics.Vulkan
                     Layout = PipelineLayout,
                     RenderPass = renderPass,
                 };
+
+                if (!gd.Capabilities.SupportsVertexInputDynamicState)
+                {
+                    pipelineCreateInfo.PVertexInputState = &vertexInputState;
+                }
 
                 if (!gd.Capabilities.SupportsExtendedDynamicState2.ExtendedDynamicState2PatchControlPoints)
                 {
