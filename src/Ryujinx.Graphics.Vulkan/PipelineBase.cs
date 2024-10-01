@@ -103,6 +103,8 @@ namespace Ryujinx.Graphics.Vulkan
         private VertexInputBindingDescription2EXT[] _vertexBindingDescriptions2;
         private uint _vertexBindingDescriptionsCount;
         private uint _vertexAttributeDescriptionsCount;
+        
+        private readonly int[] _vertexBufferBindings;
 
         public unsafe PipelineBase(VulkanRenderer gd, Device device)
         {
@@ -139,6 +141,12 @@ namespace Ryujinx.Graphics.Vulkan
             _supportExtDynamic = gd.Capabilities.SupportsExtendedDynamicState;
 
             _supportExtDynamic2 = gd.Capabilities.SupportsExtendedDynamicState2.ExtendedDynamicState2;
+            
+            _vertexBufferBindings = new int[Constants.MaxVertexBuffers];
+            for (int i = 0; i < Constants.MaxVertexBuffers; i++)
+            {
+                _vertexBufferBindings[i] = i + 1;
+            }
 
             _bindingsSet = false;
             _locationSet = false;
@@ -744,7 +752,7 @@ namespace Ryujinx.Graphics.Vulkan
             {
                 if (_vertexBuffers[i].Overlaps(buffer, offset, size))
                 {
-                    if (Gd.Capabilities.SupportsVertexInputDynamicState)
+                    if (Gd.Capabilities.SupportsVertexInputDynamicState && _vertexBindingDescriptions2.Length < i)
                     {
                         _vertexBuffers[i].BindVertexBuffer(Gd, Cbs, (uint)i, ref _newState, _vertexBufferUpdater, ref _vertexBindingDescriptions2[i]);
                     }
@@ -1558,10 +1566,11 @@ namespace Ryujinx.Graphics.Vulkan
                     {
                         int descriptorIndex = validCount++;
 
-                        if (_vertexBindingDescriptions2[descriptorIndex].InputRate != inputRate || _vertexBindingDescriptions2[descriptorIndex].Stride != vertexBuffer.Stride)
+                        if (_vertexBindingDescriptions2[descriptorIndex].InputRate != inputRate || _vertexBindingDescriptions2[descriptorIndex].Stride != vertexBuffer.Stride || _vertexBindingDescriptions2[descriptorIndex].Binding != _vertexBufferBindings[i])
                         {
                             _vertexBindingDescriptions2[descriptorIndex].Stride = (uint)vertexBuffer.Stride;
                             _vertexBindingDescriptions2[descriptorIndex].InputRate = inputRate;
+                            _vertexBindingDescriptions2[descriptorIndex].Binding = (uint)_vertexBufferBindings[i];
                             vertexBindingDescriptionChanged = true;
                         }
 
@@ -1579,7 +1588,7 @@ namespace Ryujinx.Graphics.Vulkan
                             }
                         }
 
-                        ref var buffer = ref _vertexBuffers[descriptorIndex];
+                        ref var buffer = ref _vertexBuffers[_vertexBufferBindings[i]];
                         int oldScalarAlign = buffer.AttributeScalarAlignment;
 
                         if (Gd.Capabilities.VertexBufferAlignment < 2 &&
@@ -1596,7 +1605,7 @@ namespace Ryujinx.Graphics.Vulkan
                                     vbSize,
                                     vertexBuffer.Stride);
 
-                                buffer.BindVertexBuffer(Gd, Cbs, (uint)descriptorIndex, ref _newState, _vertexBufferUpdater, ref _vertexBindingDescriptions2[i]);
+                                buffer.BindVertexBuffer(Gd, Cbs, (uint)_vertexBufferBindings[i], ref _newState, _vertexBufferUpdater, ref _vertexBindingDescriptions2[i]);
                             }
                         }
                         else
@@ -1612,7 +1621,7 @@ namespace Ryujinx.Graphics.Vulkan
                                 vbSize,
                                 vertexBuffer.Stride);
 
-                            _vertexBuffersDirty |= 1UL << descriptorIndex;
+                            _vertexBuffersDirty |= 1UL << _vertexBufferBindings[i];
                         }
 
                         buffer.AttributeScalarAlignment = oldScalarAlign;
