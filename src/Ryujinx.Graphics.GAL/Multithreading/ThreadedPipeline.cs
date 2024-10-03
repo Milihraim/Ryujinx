@@ -159,15 +159,15 @@ namespace Ryujinx.Graphics.GAL.Multithreading
             _renderer.QueueCommand();
         }
 
-        public void SetDepthTest(DepthTestDescriptor depthTest, bool signalChange = true)
+        public void SetDepthTest(DepthTestDescriptor depthTest)
         {
             _renderer.New<SetDepthTestCommand>().Set(depthTest);
             _renderer.QueueCommand();
         }
 
-        public void SetFaceCulling(Face face)
+        public void SetFaceCulling(bool enable, Face face)
         {
-            _renderer.New<SetFaceCullingCommand>().Set(face);
+            _renderer.New<SetFaceCullingCommand>().Set(enable, face);
             _renderer.QueueCommand();
         }
 
@@ -243,13 +243,13 @@ namespace Ryujinx.Graphics.GAL.Multithreading
             _renderer.QueueCommand();
         }
 
-        public void SetPrimitiveTopology(PrimitiveTopology topology, bool signalChange = true)
+        public void SetPrimitiveTopology(PrimitiveTopology topology)
         {
             _renderer.New<SetPrimitiveTopologyCommand>().Set(topology);
             _renderer.QueueCommand();
         }
 
-        public void SetProgram(IProgram program, bool signalChange = true)
+        public void SetProgram(IProgram program)
         {
             _renderer.New<SetProgramCommand>().Set(Ref(program));
             _renderer.QueueCommand();
@@ -261,7 +261,7 @@ namespace Ryujinx.Graphics.GAL.Multithreading
             _renderer.QueueCommand();
         }
 
-        public void SetRenderTargetColorMasks(ReadOnlySpan<uint> componentMask, bool signalChange = true)
+        public void SetRenderTargetColorMasks(ReadOnlySpan<uint> componentMask)
         {
             _renderer.New<SetRenderTargetColorMasksCommand>().Set(_renderer.CopySpan(componentMask));
             _renderer.QueueCommand();
@@ -273,7 +273,7 @@ namespace Ryujinx.Graphics.GAL.Multithreading
             _renderer.QueueCommand();
         }
 
-        public void SetScissors(ReadOnlySpan<Rectangle<int>> scissors, bool signalChange = true)
+        public void SetScissors(ReadOnlySpan<Rectangle<int>> scissors)
         {
             _renderer.New<SetScissorsCommand>().Set(_renderer.CopySpan(scissors));
             _renderer.QueueCommand();
@@ -339,7 +339,7 @@ namespace Ryujinx.Graphics.GAL.Multithreading
             _renderer.QueueCommand();
         }
 
-        public void SetViewports(ReadOnlySpan<Viewport> viewports, bool signalChange = true)
+        public void SetViewports(ReadOnlySpan<Viewport> viewports)
         {
             _renderer.New<SetViewportsCommand>().Set(_renderer.CopySpan(viewports));
             _renderer.QueueCommand();

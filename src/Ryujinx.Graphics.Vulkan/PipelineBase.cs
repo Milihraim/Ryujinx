@@ -1,5 +1,3 @@
-using Ryujinx.Common.Logging;
-using Ryujinx.Common.Memory;
 using Ryujinx.Graphics.GAL;
 using Ryujinx.Graphics.Shader;
 using Silk.NET.Vulkan;
@@ -76,7 +74,6 @@ namespace Ryujinx.Graphics.Vulkan
         private readonly BufferState[] _transformFeedbackBuffers;
         private readonly VertexBufferState[] _vertexBuffers;
         private ulong _vertexBuffersDirty;
-        private bool _bindingsSet;
         protected Rectangle<int> ClearScissor;
 
         private readonly VertexBufferUpdater _vertexBufferUpdater;
@@ -90,17 +87,12 @@ namespace Ryujinx.Graphics.Vulkan
         private bool _tfEnabled;
         private bool _tfActive;
 
-        private readonly bool _supportExtDynamic;
-        private readonly bool _supportExtDynamic2;
-
         private FeedbackLoopAspects _feedbackLoop;
         private bool _passWritesDepthStencil;
 
         private readonly PipelineColorBlendAttachmentState[] _storedBlend;
         public ulong DrawCount { get; private set; }
         public bool RenderPassActive { get; private set; }
-
-        private readonly int[] _vertexBufferBindings;
 
         public unsafe PipelineBase(VulkanRenderer gd, Device device)
         {
@@ -134,19 +126,7 @@ namespace Ryujinx.Graphics.Vulkan
 
             _storedBlend = new PipelineColorBlendAttachmentState[Constants.MaxRenderTargets];
 
-            _supportExtDynamic = gd.Capabilities.SupportsExtendedDynamicState;
-
-            _supportExtDynamic2 = gd.Capabilities.SupportsExtendedDynamicState2.ExtendedDynamicState2;
-
-            _bindingsSet = false;
-
-            _vertexBufferBindings = new int[Constants.MaxVertexBuffers];
-            for (int i = 0; i < Constants.MaxVertexBuffers; i++)
-            {
-                _vertexBufferBindings[i] = i + 1;
-            }
-
-            _newState.Initialize(gd.Capabilities);
+            _newState.Initialize();
         }
 
         public void Initialize()
@@ -652,46 +632,19 @@ namespace Ryujinx.Graphics.Vulkan
         {
             if (texture is TextureView srcTexture)
             {
-                CullModeFlags oldCullMode;
-                bool oldStencilTestEnable;
-                bool oldDepthTestEnable;
-                bool oldDepthWriteEnable;
-                PrimitiveTopology oldTopology;
-                Array16<Silk.NET.Vulkan.Viewport> oldViewports = DynamicState.Viewports;
-                uint oldViewportsCount;
+                var oldCullMode = _newState.CullMode;
+                var oldStencilTestEnable = _newState.StencilTestEnable;
+                var oldDepthTestEnable = _newState.DepthTestEnable;
+                var oldDepthWriteEnable = _newState.DepthWriteEnable;
+                var oldViewports = DynamicState.Viewports;
+                var oldViewportsCount = _newState.ViewportsCount;
+                var oldTopology = _topology;
 
-                if (_supportExtDynamic)
-                {
-                    oldCullMode = DynamicState.CullMode;
-                    oldStencilTestEnable = DynamicState.StencilTestEnable;
-                    oldDepthTestEnable = DynamicState.DepthTestEnable;
-                    oldDepthWriteEnable = DynamicState.DepthWriteEnable;
-                    oldTopology = _topology;
-                    oldViewportsCount = DynamicState.ViewportsCount;
-                }
-                else
-                {
-                    oldCullMode = _newState.CullMode;
-                    oldStencilTestEnable = _newState.StencilTestEnable;
-                    oldDepthTestEnable = _newState.DepthTestEnable;
-                    oldDepthWriteEnable = _newState.DepthWriteEnable;
-                    oldTopology = _topology;
-                    oldViewportsCount = _newState.ViewportsCount;
-                }
-
-                if (_supportExtDynamic)
-                {
-                    DynamicState.SetCullMode(CullModeFlags.None);
-                    DynamicState.SetDepthTestBool(false, false);
-                    DynamicState.SetStencilTest(false);
-                }
-                else
-                {
-                    _newState.CullMode = CullModeFlags.None;
-                    _newState.StencilTestEnable = false;
-                    _newState.DepthTestEnable = false;
-                    _newState.DepthWriteEnable = false;
-                }
+                _newState.CullMode = CullModeFlags.None;
+                _newState.StencilTestEnable = false;
+                _newState.DepthTestEnable = false;
+                _newState.DepthWriteEnable = false;
+                SignalStateChange();
 
                 Gd.HelperShader.DrawTexture(
                     Gd,
@@ -701,24 +654,16 @@ namespace Ryujinx.Graphics.Vulkan
                     srcRegion,
                     dstRegion);
 
-                if (_supportExtDynamic)
-                {
-                    DynamicState.SetCullMode(oldCullMode);
-                    DynamicState.SetStencilTest(oldStencilTestEnable);
-                    DynamicState.SetDepthTestBool(oldDepthTestEnable, oldDepthWriteEnable);
-                }
-                else
-                {
-                    _newState.CullMode = oldCullMode;
-                    _newState.StencilTestEnable = oldStencilTestEnable;
-                    _newState.DepthTestEnable = oldDepthTestEnable;
-                    _newState.DepthWriteEnable = oldDepthWriteEnable;
-                    _newState.ViewportsCount = oldViewportsCount;
-                }
-
+                _newState.CullMode = oldCullMode;
+                _newState.StencilTestEnable = oldStencilTestEnable;
+                _newState.DepthTestEnable = oldDepthTestEnable;
+                _newState.DepthWriteEnable = oldDepthWriteEnable;
                 SetPrimitiveTopology(oldTopology);
 
                 DynamicState.SetViewports(ref oldViewports, oldViewportsCount);
+
+                _newState.ViewportsCount = oldViewportsCount;
+                SignalStateChange();
             }
         }
 
@@ -847,102 +792,48 @@ namespace Ryujinx.Graphics.Vulkan
 
         public void SetDepthBias(PolygonModeMask enables, float factor, float units, float clamp)
         {
-            bool depthBiasEnable = (enables != 0) && (factor != 0 && units != 0);
-            bool changed = false;
+            DynamicState.SetDepthBias(factor, units, clamp);
 
-            if (_supportExtDynamic2)
-            {
-                DynamicState.SetDepthBiasEnable(depthBiasEnable);
-            }
-            else if (_newState.DepthBiasEnable != depthBiasEnable)
-            {
-                _newState.DepthBiasEnable = depthBiasEnable;
-                changed = true;
-            }
-
-            if (depthBiasEnable)
-            {
-                DynamicState.SetDepthBias(factor, units, clamp);
-            }
-
-            if (changed)
-            {
-                SignalStateChange();
-            }
+            _newState.DepthBiasEnable = enables != 0;
+            SignalStateChange();
         }
 
         public void SetDepthClamp(bool clamp)
         {
             _newState.DepthClampEnable = clamp;
-
             SignalStateChange();
         }
 
         public void SetDepthMode(DepthMode mode)
         {
-            bool newMode = mode == DepthMode.MinusOneToOne;
-
-            if (_newState.DepthMode == newMode)
+            bool oldMode = _newState.DepthMode;
+            _newState.DepthMode = mode == DepthMode.MinusOneToOne;
+            if (_newState.DepthMode != oldMode)
             {
-                return;
+                SignalStateChange();
             }
+        }
 
-            _newState.DepthMode = newMode;
+        public void SetDepthTest(DepthTestDescriptor depthTest)
+        {
+            _newState.DepthTestEnable = depthTest.TestEnable;
+            _newState.DepthWriteEnable = depthTest.WriteEnable;
+            _newState.DepthCompareOp = depthTest.Func.Convert();
 
+            UpdatePassDepthStencil();
             SignalStateChange();
         }
 
-        public void SetDepthTest(DepthTestDescriptor depthTest, bool signalChange = true)
+        public void SetFaceCulling(bool enable, Face face)
         {
-            if (_supportExtDynamic)
-            {
-                DynamicState.SetDepthTestBool(depthTest.TestEnable, depthTest.WriteEnable);
-                if (depthTest.TestEnable)
-                {
-                    DynamicState.SetDepthTestCompareOp(depthTest.Func.Convert());
-                }
-            }
-            else
-            {
-                _newState.DepthTestEnable = depthTest.TestEnable;
-                _newState.DepthWriteEnable = depthTest.WriteEnable;
-                _newState.DepthCompareOp = depthTest.Func.Convert();
-
-                if (signalChange)
-                {
-                    SignalStateChange();
-                }
-            }
-
-            UpdatePassDepthStencil();
-        }
-
-        public void SetFaceCulling(Face face)
-        {
-            if (_supportExtDynamic)
-            {
-                DynamicState.SetCullMode(face.Convert());
-            }
-            else
-            {
-                _newState.CullMode = face.Convert();
-
-                SignalStateChange();
-            }
+            _newState.CullMode = enable ? face.Convert() : CullModeFlags.None;
+            SignalStateChange();
         }
 
         public void SetFrontFace(FrontFace frontFace)
         {
-            if (_supportExtDynamic)
-            {
-                DynamicState.SetFrontFace(frontFace.Convert());
-            }
-            else
-            {
-                _newState.FrontFace = frontFace.Convert();
-
-                SignalStateChange();
-            }
+            _newState.FrontFace = frontFace.Convert();
+            SignalStateChange();
         }
 
         public void SetImage(ShaderStage stage, int binding, ITexture image)
@@ -981,56 +872,28 @@ namespace Ryujinx.Graphics.Vulkan
 
         public void SetLineParameters(float width, bool smooth)
         {
-            if (!Gd.IsMoltenVk)
-            {
-                DynamicState.SetLineWidth(Gd.Capabilities.SupportsWideLines ? width : 1.0f);
-            }
+            _newState.LineWidth = width;
+            SignalStateChange();
         }
 
         public void SetLogicOpState(bool enable, LogicalOp op)
         {
-            // Vendors other than NVIDIA have a bug where it enables logical operations even for float formats,
-            // so we need to force disable them here.
-            bool logicOpEnable = enable && (Gd.Vendor == Vendor.Nvidia || _newState.Internal.LogicOpsAllowed);
-
             _newState.LogicOpEnable = enable;
-
-            if (Gd.Capabilities.SupportsExtendedDynamicState2.ExtendedDynamicState2LogicOp)
-            {
-                if (logicOpEnable)
-                {
-                    DynamicState.SetLogicOp(op.Convert());
-                }
-            }
-            else
-            {
-                _newState.LogicOp = op.Convert();
-            }
-
+            _newState.LogicOp = op.Convert();
             SignalStateChange();
         }
 
         public void SetMultisampleState(MultisampleDescriptor multisample)
         {
             _newState.AlphaToCoverageEnable = multisample.AlphaToCoverageEnable;
-
             _newState.AlphaToOneEnable = multisample.AlphaToOneEnable;
-
             SignalStateChange();
         }
 
         public void SetPatchParameters(int vertices, ReadOnlySpan<float> defaultOuterLevel, ReadOnlySpan<float> defaultInnerLevel)
         {
-            if (Gd.Capabilities.SupportsExtendedDynamicState2.ExtendedDynamicState2PatchControlPoints)
-            {
-                DynamicState.SetPatchControlPoints((uint)vertices);
-            }
-            else
-            {
-                _newState.PatchControlPoints = (uint)vertices;
-
-                SignalStateChange();
-            }
+            _newState.PatchControlPoints = (uint)vertices;
+            SignalStateChange();
 
             // TODO: Default levels (likely needs emulation on shaders?)
         }
@@ -1047,21 +910,12 @@ namespace Ryujinx.Graphics.Vulkan
 
         public void SetPrimitiveRestart(bool enable, int index)
         {
-            if (_supportExtDynamic2)
-            {
-                DynamicState.SetPrimitiveRestartEnable(enable);
-            }
-            else
-            {
-                _newState.PrimitiveRestartEnable = enable;
-
-                SignalStateChange();
-            }
-
+            _newState.PrimitiveRestartEnable = enable;
             // TODO: What to do about the index?
+            SignalStateChange();
         }
 
-        public void SetPrimitiveTopology(PrimitiveTopology topology, bool signalChange = true)
+        public void SetPrimitiveTopology(PrimitiveTopology topology)
         {
             _topology = topology;
 
@@ -1069,18 +923,10 @@ namespace Ryujinx.Graphics.Vulkan
 
             _newState.Topology = vkTopology;
 
-            if (_supportExtDynamic)
-            {
-                DynamicState.SetPrimitiveTopology(vkTopology);
-            }
-
-            if (signalChange)
-            {
-                SignalStateChange();
-            }
+            SignalStateChange();
         }
 
-        public void SetProgram(IProgram program, bool signalChange = true)
+        public void SetProgram(IProgram program)
         {
             var internalProgram = (ShaderCollection)program;
             var stages = internalProgram.GetInfos();
@@ -1096,10 +942,7 @@ namespace Ryujinx.Graphics.Vulkan
 
             stages.CopyTo(_newState.Stages.AsSpan()[..stages.Length]);
 
-            if (signalChange)
-            {
-                SignalStateChange();
-            }
+            SignalStateChange();
 
             if (internalProgram.IsCompute)
             {
@@ -1125,26 +968,18 @@ namespace Ryujinx.Graphics.Vulkan
 
         public void SetRasterizerDiscard(bool discard)
         {
-            if (_supportExtDynamic2)
-            {
-                DynamicState.SetRasterizerDiscard(discard);
-            }
-            else
-            {
-                _newState.RasterizerDiscardEnable = discard;
-
-                SignalStateChange();
-            }
+            _newState.RasterizerDiscardEnable = discard;
+            SignalStateChange();
 
             if (!discard && Gd.IsQualcommProprietary)
             {
                 // On Adreno, enabling rasterizer discard somehow corrupts the viewport state.
                 // Force it to be updated on next use to work around this bug.
-                DynamicState.ForceAllDirty(Gd);
+                DynamicState.ForceAllDirty();
             }
         }
 
-        public void SetRenderTargetColorMasks(ReadOnlySpan<uint> componentMask, bool signalChange = true)
+        public void SetRenderTargetColorMasks(ReadOnlySpan<uint> componentMask)
         {
             int count = Math.Min(Constants.MaxRenderTargets, componentMask.Length);
             int writtenAttachments = 0;
@@ -1184,10 +1019,7 @@ namespace Ryujinx.Graphics.Vulkan
             }
             else
             {
-                if (signalChange)
-                {
-                    SignalStateChange();
-                }
+                SignalStateChange();
 
                 if (writtenAttachments != _writtenAttachmentCount)
                 {
@@ -1211,7 +1043,7 @@ namespace Ryujinx.Graphics.Vulkan
             SetRenderTargetsInternal(colors, depthStencil, Gd.IsTBDR);
         }
 
-        public void SetScissors(ReadOnlySpan<Rectangle<int>> regions, bool signalChange = true)
+        public void SetScissors(ReadOnlySpan<Rectangle<int>> regions)
         {
             int maxScissors = Gd.Capabilities.SupportsMultiView ? Constants.MaxViewports : 1;
             int count = Math.Min(maxScissors, regions.Length);
@@ -1219,8 +1051,6 @@ namespace Ryujinx.Graphics.Vulkan
             {
                 ClearScissor = regions[0];
             }
-
-            DynamicState.ScissorsCount = count;
 
             for (int i = 0; i < count; i++)
             {
@@ -1231,56 +1061,34 @@ namespace Ryujinx.Graphics.Vulkan
                 DynamicState.SetScissor(i, new Rect2D(offset, extent));
             }
 
-            if (!_supportExtDynamic)
-            {
-                _newState.ScissorsCount = (uint)count;
+            DynamicState.ScissorsCount = count;
 
-                if (signalChange)
-                {
-                    SignalStateChange();
-                }
-            }
+            _newState.ScissorsCount = (uint)count;
+            SignalStateChange();
         }
 
         public void SetStencilTest(StencilTestDescriptor stencilTest)
         {
-            if (_supportExtDynamic)
-            {
-                DynamicState.SetStencilTestandOp(
-                    stencilTest.BackSFail.Convert(),
-                    stencilTest.BackDpPass.Convert(),
-                    stencilTest.BackDpFail.Convert(),
-                    stencilTest.BackFunc.Convert(),
-                    stencilTest.FrontSFail.Convert(),
-                    stencilTest.FrontDpPass.Convert(),
-                    stencilTest.FrontDpFail.Convert(),
-                    stencilTest.FrontFunc.Convert(),
-                    stencilTest.TestEnable);
-
-                UpdatePassDepthStencil();
-            }
-            else
-            {
-                _newState.StencilBackFailOp = stencilTest.BackSFail.Convert();
-                _newState.StencilBackPassOp = stencilTest.BackDpPass.Convert();
-                _newState.StencilBackDepthFailOp = stencilTest.BackDpFail.Convert();
-                _newState.StencilBackCompareOp = stencilTest.BackFunc.Convert();
-                _newState.StencilFrontFailOp = stencilTest.FrontSFail.Convert();
-                _newState.StencilFrontPassOp = stencilTest.FrontDpPass.Convert();
-                _newState.StencilFrontDepthFailOp = stencilTest.FrontDpFail.Convert();
-                _newState.StencilFrontCompareOp = stencilTest.FrontFunc.Convert();
-                _newState.StencilTestEnable = stencilTest.TestEnable;
-
-                UpdatePassDepthStencil();
-                SignalStateChange();
-            }
-
-            DynamicState.SetStencilMask((uint)stencilTest.BackFuncMask,
+            DynamicState.SetStencilMasks(
+                (uint)stencilTest.BackFuncMask,
                 (uint)stencilTest.BackMask,
                 (uint)stencilTest.BackFuncRef,
                 (uint)stencilTest.FrontFuncMask,
                 (uint)stencilTest.FrontMask,
                 (uint)stencilTest.FrontFuncRef);
+
+            _newState.StencilTestEnable = stencilTest.TestEnable;
+            _newState.StencilBackFailOp = stencilTest.BackSFail.Convert();
+            _newState.StencilBackPassOp = stencilTest.BackDpPass.Convert();
+            _newState.StencilBackDepthFailOp = stencilTest.BackDpFail.Convert();
+            _newState.StencilBackCompareOp = stencilTest.BackFunc.Convert();
+            _newState.StencilFrontFailOp = stencilTest.FrontSFail.Convert();
+            _newState.StencilFrontPassOp = stencilTest.FrontDpPass.Convert();
+            _newState.StencilFrontDepthFailOp = stencilTest.FrontDpFail.Convert();
+            _newState.StencilFrontCompareOp = stencilTest.FrontFunc.Convert();
+
+            UpdatePassDepthStencil();
+            SignalStateChange();
         }
 
         public void SetStorageBuffers(ReadOnlySpan<BufferAssignment> buffers)
@@ -1399,24 +1207,12 @@ namespace Ryujinx.Graphics.Vulkan
         {
             int count = Math.Min(Constants.MaxVertexBuffers, vertexBuffers.Length);
 
+            _newState.Internal.VertexBindingDescriptions[0] = new VertexInputBindingDescription(0, 0, VertexInputRate.Vertex);
+
             int validCount = 1;
-
-            if (!_bindingsSet)
-            {
-                _newState.Internal.VertexBindingDescriptions[0] = new VertexInputBindingDescription(0, _supportExtDynamic && (!Gd.IsMoltenVk || Gd.SupportsMTL31) ? null : 0, VertexInputRate.Vertex);
-
-                for (int i = 1; i < count; i++)
-                {
-                    _newState.Internal.VertexBindingDescriptions[i] = new VertexInputBindingDescription((uint)i);
-                }
-
-                _bindingsSet = true;
-            }
 
             BufferHandle lastHandle = default;
             Auto<DisposableBuffer> lastBuffer = default;
-            bool vertexBindingDescriptionChanged = false;
-            bool vertexDescriptionCountChanged = false;
 
             for (int i = 0; i < count; i++)
             {
@@ -1435,32 +1231,13 @@ namespace Ryujinx.Graphics.Vulkan
 
                     if (vb != null)
                     {
+                        int binding = i + 1;
                         int descriptorIndex = validCount++;
 
-                        if (_supportExtDynamic && (!Gd.IsMoltenVk || Gd.SupportsMTL31))
-                        {
-                            if (_newState.Internal.VertexBindingDescriptions[descriptorIndex].InputRate != inputRate ||
-                                _newState.Internal.VertexBindingDescriptions[descriptorIndex].Binding != _vertexBufferBindings[i])
-                            {
-                                _newState.Internal.VertexBindingDescriptions[descriptorIndex].InputRate = inputRate;
-                                _newState.Internal.VertexBindingDescriptions[descriptorIndex].Binding = (uint)_vertexBufferBindings[i];
-
-                                vertexBindingDescriptionChanged = true;
-                            }
-                        }
-                        else
-                        {
-                            if (_newState.Internal.VertexBindingDescriptions[descriptorIndex].InputRate != inputRate ||
-                                _newState.Internal.VertexBindingDescriptions[descriptorIndex].Stride != vertexBuffer.Stride ||
-                                _newState.Internal.VertexBindingDescriptions[descriptorIndex].Binding != _vertexBufferBindings[i])
-                            {
-                                _newState.Internal.VertexBindingDescriptions[descriptorIndex].Binding = (uint)_vertexBufferBindings[i];
-                                _newState.Internal.VertexBindingDescriptions[descriptorIndex].Stride = (uint)vertexBuffer.Stride;
-                                _newState.Internal.VertexBindingDescriptions[descriptorIndex].InputRate = inputRate;
-
-                                vertexBindingDescriptionChanged = true;
-                            }
-                        }
+                        _newState.Internal.VertexBindingDescriptions[descriptorIndex] = new VertexInputBindingDescription(
+                            (uint)binding,
+                            (uint)vertexBuffer.Stride,
+                            inputRate);
 
                         int vbSize = vertexBuffer.Buffer.Size;
 
@@ -1476,7 +1253,7 @@ namespace Ryujinx.Graphics.Vulkan
                             }
                         }
 
-                        ref var buffer = ref _vertexBuffers[_vertexBufferBindings[i]];
+                        ref var buffer = ref _vertexBuffers[binding];
                         int oldScalarAlign = buffer.AttributeScalarAlignment;
 
                         if (Gd.Capabilities.VertexBufferAlignment < 2 &&
@@ -1493,7 +1270,7 @@ namespace Ryujinx.Graphics.Vulkan
                                     vbSize,
                                     vertexBuffer.Stride);
 
-                                buffer.BindVertexBuffer(Gd, Cbs, (uint)_vertexBufferBindings[i], ref _newState, _vertexBufferUpdater);
+                                buffer.BindVertexBuffer(Gd, Cbs, (uint)binding, ref _newState, _vertexBufferUpdater);
                             }
                         }
                         else
@@ -1509,7 +1286,7 @@ namespace Ryujinx.Graphics.Vulkan
                                 vbSize,
                                 vertexBuffer.Stride);
 
-                            _vertexBuffersDirty |= 1UL << _vertexBufferBindings[i];
+                            _vertexBuffersDirty |= 1UL << binding;
                         }
 
                         buffer.AttributeScalarAlignment = oldScalarAlign;
@@ -1519,19 +1296,11 @@ namespace Ryujinx.Graphics.Vulkan
 
             _vertexBufferUpdater.Commit(Cbs);
 
-            if (_newState.VertexBindingDescriptionsCount != validCount)
-            {
-                _newState.VertexBindingDescriptionsCount = (uint)validCount;
-                vertexDescriptionCountChanged = true;
-            }
-
-            if (vertexDescriptionCountChanged || vertexBindingDescriptionChanged)
-            {
-                SignalStateChange();
-            }
+            _newState.VertexBindingDescriptionsCount = (uint)validCount;
+            SignalStateChange();
         }
 
-        public void SetViewports(ReadOnlySpan<Viewport> viewports, bool signalChange = true)
+        public void SetViewports(ReadOnlySpan<Viewport> viewports)
         {
             int maxViewports = Gd.Capabilities.SupportsMultiView ? Constants.MaxViewports : 1;
             int count = Math.Min(maxViewports, viewports.Length);
@@ -1556,15 +1325,8 @@ namespace Ryujinx.Graphics.Vulkan
                     Clamp(viewport.DepthFar)));
             }
 
-            if (!_supportExtDynamic)
-            {
-                _newState.ViewportsCount = (uint)count;
-
-                if (signalChange)
-                {
-                    SignalStateChange();
-                }
-            }
+            _newState.ViewportsCount = (uint)count;
+            SignalStateChange();
         }
 
         public void SwapBuffer(Auto<DisposableBuffer> from, Auto<DisposableBuffer> to)
@@ -1613,7 +1375,7 @@ namespace Ryujinx.Graphics.Vulkan
             _vertexBuffersDirty = ulong.MaxValue >> (64 - _vertexBuffers.Length);
 
             _descriptorSetUpdater.SignalCommandBufferChange();
-            DynamicState.ForceAllDirty(Gd);
+            DynamicState.ForceAllDirty();
             _currentPipelineHandle = 0;
         }
 
@@ -1767,10 +1529,9 @@ namespace Ryujinx.Graphics.Vulkan
             {
                 if (Gd.Capabilities.SupportsDynamicAttachmentFeedbackLoop)
                 {
-                    _newState.FeedbackLoopDynamicState = true;
                     DynamicState.SetFeedbackLoop(aspects);
                 }
-                else if (Gd.Capabilities.SupportsAttachmentFeedbackLoop)
+                else
                 {
                     _newState.FeedbackLoopAspects = aspects;
                 }
@@ -1830,14 +1591,7 @@ namespace Ryujinx.Graphics.Vulkan
             }
 
             // Stencil test being enabled doesn't necessarily mean a write, but it's not critical to check.
-            if (_supportExtDynamic)
-            {
-                _passWritesDepthStencil |= (DynamicState.DepthTestEnable && DynamicState.DepthWriteEnable) || DynamicState.StencilTestEnable;
-            }
-            else
-            {
-                _passWritesDepthStencil |= (_newState.DepthTestEnable && _newState.DepthWriteEnable) || _newState.StencilTestEnable;
-            }
+            _passWritesDepthStencil |= (_newState.DepthTestEnable && _newState.DepthWriteEnable) || _newState.StencilTestEnable;
         }
 
         private bool RecreateGraphicsPipelineIfNeeded()

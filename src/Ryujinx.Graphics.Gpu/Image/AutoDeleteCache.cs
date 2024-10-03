@@ -1,4 +1,3 @@
-using System;
 using System.Collections;
 using System.Collections.Generic;
 
@@ -47,11 +46,7 @@ namespace Ryujinx.Graphics.Gpu.Image
     {
         private const int MinCountForDeletion = 32;
         private const int MaxCapacity = 2048;
-        private const ulong MinTextureSizeCapacity = 512 * 1024 * 1024;
-        private const ulong MaxTextureSizeCapacity = 4UL * 1024 * 1024 * 1024;
-        private const ulong DefaultTextureSizeCapacity = 1UL * 1024 * 1024 * 1024;
-        private const float MemoryScaleFactor = 0.50f;
-        private ulong _maxCacheMemoryUsage = 0;
+        private const ulong MaxTextureSizeCapacity = 1024 * 1024 * 1024; // MB;
 
         private readonly LinkedList<Texture> _textures;
         private ulong _totalSize;
@@ -60,25 +55,6 @@ namespace Ryujinx.Graphics.Gpu.Image
         private HashSet<ShortTextureCacheEntry> _shortCache;
 
         private readonly Dictionary<TextureDescriptor, ShortTextureCacheEntry> _shortCacheLookup;
-
-        /// <summary>
-        /// Initializes the cache, setting the maximum texture capacity for the specified GPU context.
-        /// </summary>
-        /// <remarks>
-        /// If the backend GPU has 0 memory capacity, the cache size defaults to `DefaultTextureSizeCapacity`.
-        /// </remarks>
-        /// <param name="context">The GPU context that the cache belongs to</param>
-        public void Initialize(GpuContext context)
-        {
-            var cacheMemory = (ulong)(context.Capabilities.MaximumGpuMemory * MemoryScaleFactor);
-
-            _maxCacheMemoryUsage = Math.Clamp(cacheMemory, MinTextureSizeCapacity, MaxTextureSizeCapacity);
-
-            if (context.Capabilities.MaximumGpuMemory == 0)
-            {
-                _maxCacheMemoryUsage = DefaultTextureSizeCapacity;
-            }
-        }
 
         /// <summary>
         /// Creates a new instance of the automatic deletion cache.
@@ -109,7 +85,7 @@ namespace Ryujinx.Graphics.Gpu.Image
             texture.CacheNode = _textures.AddLast(texture);
 
             if (_textures.Count > MaxCapacity ||
-                (_totalSize > _maxCacheMemoryUsage && _textures.Count >= MinCountForDeletion))
+                (_totalSize > MaxTextureSizeCapacity && _textures.Count >= MinCountForDeletion))
             {
                 RemoveLeastUsedTexture();
             }
@@ -134,7 +110,7 @@ namespace Ryujinx.Graphics.Gpu.Image
                     _textures.AddLast(texture.CacheNode);
                 }
 
-                if (_totalSize > _maxCacheMemoryUsage && _textures.Count >= MinCountForDeletion)
+                if (_totalSize > MaxTextureSizeCapacity && _textures.Count >= MinCountForDeletion)
                 {
                     RemoveLeastUsedTexture();
                 }

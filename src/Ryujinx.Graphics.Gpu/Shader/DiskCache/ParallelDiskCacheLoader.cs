@@ -22,8 +22,6 @@ namespace Ryujinx.Graphics.Gpu.Shader.DiskCache
         private readonly CancellationToken _cancellationToken;
         private readonly Action<ShaderCacheState, int, int> _stateChangeCallback;
 
-        private readonly HashSet<ProgramPipelineState> _pipelineStateSet = new();
-
         /// <summary>
         /// Indicates if the cache should be loaded.
         /// </summary>
@@ -234,7 +232,10 @@ namespace Ryujinx.Graphics.Gpu.Shader.DiskCache
 
             for (int index = 0; index < ThreadCount; index++)
             {
-                workThreads[index] = new Thread(ProcessAsyncQueue) { Name = $"GPU.AsyncTranslationThread.{index}", };
+                workThreads[index] = new Thread(ProcessAsyncQueue)
+                {
+                    Name = $"GPU.AsyncTranslationThread.{index}",
+                };
             }
 
             int programCount = _hostStorage.GetProgramCount();
@@ -304,8 +305,6 @@ namespace Ryujinx.Graphics.Gpu.Shader.DiskCache
                         using var streams = _hostStorage.GetOutputStreams(_context);
 
                         int packagedShaders = 0;
-                        ProgramPipelineState currentPipelineState = default;
-
                         foreach (var kv in _programList)
                         {
                             if (!Active)
@@ -315,53 +314,12 @@ namespace Ryujinx.Graphics.Gpu.Shader.DiskCache
 
                             (CachedShaderProgram program, byte[] binaryCode) = kv.Value;
 
-                            if (program.SpecializationState.PipelineState.HasValue && _context.Capabilities.SupportsExtendedDynamicState)
-                            {
-                                currentPipelineState = program.SpecializationState.PipelineState.Value;
+                            _hostStorage.AddShader(_context, program, binaryCode, streams);
 
-                                if (_context.Capabilities.SupportsExtendedDynamicState)
-                                {
-                                    currentPipelineState.StencilTest = default;
-
-                                    currentPipelineState.CullMode = 0;
-                                    currentPipelineState.FrontFace = 0;
-                                    currentPipelineState.DepthTest = default;
-                                    currentPipelineState.Topology = ConvertToClass(currentPipelineState.Topology);
-                                }
-
-                                if (_context.Capabilities.SupportsExtendedDynamicState2)
-                                {
-                                    currentPipelineState.PrimitiveRestartEnable = false;
-                                    currentPipelineState.BiasEnable = 0;
-                                    currentPipelineState.RasterizerDiscard = false;
-                                }
-
-                                if (_context.Capabilities.SupportsLogicOpDynamicState)
-                                {
-                                    currentPipelineState.LogicOp = 0;
-                                }
-
-                                if (_context.Capabilities.SupportsPatchControlPointsDynamicState)
-                                {
-                                    currentPipelineState.PatchControlPoints = 0;
-                                }
-                            }
-
-                            if (!_pipelineStateSet.Contains(currentPipelineState) ||
-                                !_context.Capabilities.SupportsExtendedDynamicState ||
-                                !program.SpecializationState.PipelineState.HasValue)
-                            {
-                                _hostStorage.AddShader(_context, program, binaryCode, streams);
-
-                                _stateChangeCallback(ShaderCacheState.Packaging, ++packagedShaders, _programList.Count);
-
-                                if (_context.Capabilities.SupportsExtendedDynamicState)
-                                {
-                                    _pipelineStateSet.Add(currentPipelineState);
-                                }
-                            }
+                            _stateChangeCallback(ShaderCacheState.Packaging, ++packagedShaders, _programList.Count);
                         }
-                        Logger.Info?.Print(LogClass.Gpu, $"Rebuilt {packagedShaders} shaders successfully.");
+
+                        Logger.Info?.Print(LogClass.Gpu, $"Rebuilt {_programList.Count} shaders successfully.");
                     }
                     else
                     {
@@ -383,29 +341,6 @@ namespace Ryujinx.Graphics.Gpu.Shader.DiskCache
             Logger.Info?.Print(LogClass.Gpu, "Shader cache loaded.");
 
             _stateChangeCallback(ShaderCacheState.Loaded, programCount, programCount);
-        }
-
-        private PrimitiveTopology ConvertToClass(PrimitiveTopology topology)
-        {
-            return topology switch
-            {
-                PrimitiveTopology.Points => PrimitiveTopology.Points,
-                PrimitiveTopology.Lines or
-                    PrimitiveTopology.LineStrip or
-                    PrimitiveTopology.LinesAdjacency or
-                    PrimitiveTopology.LineStripAdjacency => PrimitiveTopology.Lines,
-                PrimitiveTopology.Triangles or
-                    PrimitiveTopology.TriangleStrip or
-                    PrimitiveTopology.TriangleFan or
-                    PrimitiveTopology.TrianglesAdjacency or
-                    PrimitiveTopology.TriangleStripAdjacency or
-                    PrimitiveTopology.Polygon => PrimitiveTopology.TriangleStrip,
-                PrimitiveTopology.Patches => PrimitiveTopology.Patches,
-                PrimitiveTopology.Quads => PrimitiveTopology.Quads,
-                PrimitiveTopology.QuadStrip => PrimitiveTopology.QuadStrip,
-                PrimitiveTopology.LineLoop => PrimitiveTopology.LineLoop,
-                _ => PrimitiveTopology.TriangleStrip,
-            };
         }
 
         /// <summary>

@@ -9,15 +9,11 @@ namespace Ryujinx.Graphics.Vulkan
         {
         }
 
-        public void SetRenderTarget(TextureView view, uint width, uint height, bool signalChange = true)
+        public void SetRenderTarget(TextureView view, uint width, uint height)
         {
             CreateFramebuffer(view, width, height);
             CreateRenderPass();
-
-            if (signalChange)
-            {
-                SignalStateChange();
-            }
+            SignalStateChange();
         }
 
         private void CreateFramebuffer(TextureView view, uint width, uint height)
