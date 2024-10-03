@@ -190,7 +190,7 @@ namespace Ryujinx.Graphics.Shader.Translation
 
             if (stage == ShaderStage.Vertex)
             {
-                InitializeVertexOutputs(context);
+                InitializePositionOutput(context);
             }
 
             UInt128 usedAttributes = context.TranslatorContext.AttributeUsage.NextInputAttributesComponents;
@@ -236,19 +236,11 @@ namespace Ryujinx.Graphics.Shader.Translation
             }
         }
 
-        private static void InitializeVertexOutputs(EmitterContext context)
+        private static void InitializePositionOutput(EmitterContext context)
         {
             for (int c = 0; c < 4; c++)
             {
                 context.Store(StorageKind.Output, IoVariable.Position, null, Const(c), ConstF(c == 3 ? 1f : 0f));
-            }
-
-            if (context.Program.ClipDistancesWritten != 0)
-            {
-                for (int i = 0; i < 8; i++)
-                {
-                    context.Store(StorageKind.Output, IoVariable.ClipDistance, null, Const(i), ConstF(0f));
-                }
             }
         }
 

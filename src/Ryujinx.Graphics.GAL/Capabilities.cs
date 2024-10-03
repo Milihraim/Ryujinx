@@ -50,10 +50,6 @@ namespace Ryujinx.Graphics.GAL
         public readonly bool SupportsViewportSwizzle;
         public readonly bool SupportsIndirectParameters;
         public readonly bool SupportsDepthClipControl;
-        public readonly bool SupportsExtendedDynamicState;
-        public readonly bool SupportsExtendedDynamicState2;
-        public readonly bool SupportsLogicOpDynamicState;
-        public readonly bool SupportsPatchControlPointsDynamicState;
 
         public readonly int UniformBufferSetIndex;
         public readonly int StorageBufferSetIndex;
@@ -74,8 +70,6 @@ namespace Ryujinx.Graphics.GAL
         public readonly int TextureBufferOffsetAlignment;
 
         public readonly int GatherBiasPrecision;
-
-        public readonly ulong MaximumGpuMemory;
 
         public Capabilities(
             TargetApi api,
@@ -122,10 +116,6 @@ namespace Ryujinx.Graphics.GAL
             bool supportsViewportSwizzle,
             bool supportsIndirectParameters,
             bool supportsDepthClipControl,
-            bool supportsExtendedDynamicState,
-            bool supportsExtendedDynamicState2,
-            bool supportsLogicOpDynamicState,
-            bool supportsPatchControlPointsDynamicState,
             int uniformBufferSetIndex,
             int storageBufferSetIndex,
             int textureSetIndex,
@@ -141,8 +131,7 @@ namespace Ryujinx.Graphics.GAL
             int shaderSubgroupSize,
             int storageBufferOffsetAlignment,
             int textureBufferOffsetAlignment,
-            int gatherBiasPrecision,
-            ulong maximumGpuMemory)
+            int gatherBiasPrecision)
         {
             Api = api;
             VendorName = vendorName;
@@ -188,10 +177,6 @@ namespace Ryujinx.Graphics.GAL
             SupportsViewportSwizzle = supportsViewportSwizzle;
             SupportsIndirectParameters = supportsIndirectParameters;
             SupportsDepthClipControl = supportsDepthClipControl;
-            SupportsExtendedDynamicState = supportsExtendedDynamicState;
-            SupportsExtendedDynamicState2 = supportsExtendedDynamicState2;
-            SupportsLogicOpDynamicState = supportsLogicOpDynamicState;
-            SupportsPatchControlPointsDynamicState = supportsPatchControlPointsDynamicState;
             UniformBufferSetIndex = uniformBufferSetIndex;
             StorageBufferSetIndex = storageBufferSetIndex;
             TextureSetIndex = textureSetIndex;
@@ -208,7 +193,6 @@ namespace Ryujinx.Graphics.GAL
             StorageBufferOffsetAlignment = storageBufferOffsetAlignment;
             TextureBufferOffsetAlignment = textureBufferOffsetAlignment;
             GatherBiasPrecision = gatherBiasPrecision;
-            MaximumGpuMemory = maximumGpuMemory;
         }
     }
 }

@@ -743,7 +743,7 @@ namespace Ryujinx.Graphics.Gpu.Shader
                 constantBufferUsePerStageMask &= ~(1 << index);
             }
 
-            if (checkTextures && _allTextures.Length > 0)
+            if (checkTextures)
             {
                 TexturePool pool = channel.TextureManager.GetTexturePool(poolState.TexturePoolGpuVa, poolState.TexturePoolMaximumId);
 

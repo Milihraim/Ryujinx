@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
-using PrimitiveTopology = Silk.NET.Vulkan.PrimitiveTopology;
 
 namespace Ryujinx.Graphics.Vulkan
 {
@@ -529,7 +528,7 @@ namespace Ryujinx.Graphics.Vulkan
         public void CreateBackgroundComputePipeline()
         {
             PipelineState pipeline = new();
-            pipeline.Initialize(_gd.Capabilities);
+            pipeline.Initialize();
 
             pipeline.Stages[0] = _shaders[0].GetInfo();
             pipeline.StagesCount = 1;
