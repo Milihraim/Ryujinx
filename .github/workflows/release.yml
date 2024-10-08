@@ -17,10 +17,12 @@ concurrency: release
 env:
   POWERSHELL_TELEMETRY_OPTOUT: 1
   DOTNET_CLI_TELEMETRY_OPTOUT: 1
-  #RYUJINX_BASE_VERSION: "1.1"
-  #RYUJINX_TARGET_RELEASE_CHANNEL_NAME: "master"
-  #RYUJINX_TARGET_RELEASE_CHANNEL_OWNER: "Ryujinx"
-  #RYUJINX_TARGET_RELEASE_CHANNEL_REPO: "release-channel-master"
+  #RYUJINX_BASE_VERSION: "1.1" # NOTE: For now, releases for the fork will be named after Git revision hashes, this is ignored
+
+  # Should be unnecessary for us, we're releasing in-repo
+  #RYUJINX_TARGET_RELEASE_CHANNEL_OWNER: "ryujinx-mirror"
+  #RYUJINX_TARGET_RELEASE_CHANNEL_REPO: "ryujinx"
+  #RYUJINX_TARGET_RELEASE_CHANNEL_NAME: "mirror/master"
 
 jobs:
   tag:
@@ -30,7 +32,7 @@ jobs:
       - name: Get version info
         id: version_info
         run: |
-          echo "build_version=${{ env.RYUJINX_BASE_VERSION }}.${{ github.run_number }}" >> $GITHUB_OUTPUT
+          echo "build_version=r.`echo ${{ github.sha }} | cut -c1-7`" >> $GITHUB_OUTPUT
         shell: bash
 
       - name: Create tag
@@ -49,16 +51,17 @@ jobs:
         with:
           name: ${{ steps.version_info.outputs.build_version }}
           tag: ${{ steps.version_info.outputs.build_version }}
-          body: "For more information about this release please check out the official [Changelog](https://github.com/Ryujinx/Ryujinx/wiki/Changelog)."
+          draft: "true"
+          omitBody: true
           #omitBodyDuringUpdate: true
           #owner: ${{ env.RYUJINX_TARGET_RELEASE_CHANNEL_OWNER }}
           #repo: ${{ env.RYUJINX_TARGET_RELEASE_CHANNEL_REPO }}
-          token: ${{ secrets.RELEASE_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
   release:
     name: Release for ${{ matrix.platform.name }}
     runs-on: ${{ matrix.platform.os }}
-    timeout-minutes: ${{ fromJSON(vars.JOB_TIMEOUT) }}
+    timeout-minutes: 60
     strategy:
       matrix:
         platform:
@@ -78,18 +81,18 @@ jobs:
       - name: Get version info
         id: version_info
         run: |
-          echo "build_version=${{ env.RYUJINX_BASE_VERSION }}.${{ github.run_number }}" >> $GITHUB_OUTPUT
+          echo "build_version=r.`echo ${{ github.sha }} | cut -c1-7`" >> $GITHUB_OUTPUT
           echo "git_short_hash=$(git rev-parse --short "${{ github.sha }}")" >> $GITHUB_OUTPUT
         shell: bash
 
       - name: Configure for release
         run: |
-          sed -r --in-place 's/\%\%RYUJINX_BUILD_VERSION\%\%/${{ steps.version_info.outputs.build_version }}/g;' src/Ryujinx.Common/ReleaseInformation.cs
-          sed -r --in-place 's/\%\%RYUJINX_BUILD_GIT_HASH\%\%/${{ steps.version_info.outputs.git_short_hash }}/g;' src/Ryujinx.Common/ReleaseInformation.cs
-          sed -r --in-place 's/\%\%RYUJINX_TARGET_RELEASE_CHANNEL_NAME\%\%/${{ env.RYUJINX_TARGET_RELEASE_CHANNEL_NAME }}/g;' src/Ryujinx.Common/ReleaseInformation.cs
-          sed -r --in-place 's/\%\%RYUJINX_TARGET_RELEASE_CHANNEL_OWNER\%\%/${{ env.RYUJINX_TARGET_RELEASE_CHANNEL_OWNER }}/g;' src/Ryujinx.Common/ReleaseInformation.cs
-          sed -r --in-place 's/\%\%RYUJINX_TARGET_RELEASE_CHANNEL_REPO\%\%/${{ env.RYUJINX_TARGET_RELEASE_CHANNEL_REPO }}/g;' src/Ryujinx.Common/ReleaseInformation.cs
-          sed -r --in-place 's/\%\%RYUJINX_CONFIG_FILE_NAME\%\%/Config\.json/g;' src/Ryujinx.Common/ReleaseInformation.cs
+          sed -r --in-place 's&\%\%RYUJINX_BUILD_VERSION\%\%&${{ steps.version_info.outputs.build_version }}&g;' src/Ryujinx.Common/ReleaseInformation.cs
+          sed -r --in-place 's&\%\%RYUJINX_BUILD_GIT_HASH\%\%&${{ steps.version_info.outputs.git_short_hash }}&g;' src/Ryujinx.Common/ReleaseInformation.cs
+          sed -r --in-place 's&\%\%RYUJINX_TARGET_RELEASE_CHANNEL_OWNER\%\%&${{ github.repository_owner }}&g;' src/Ryujinx.Common/ReleaseInformation.cs
+          sed -r --in-place 's&\%\%RYUJINX_TARGET_RELEASE_CHANNEL_REPO\%\%&${{ github.event.repository.name }}&g;' src/Ryujinx.Common/ReleaseInformation.cs
+          sed -r --in-place 's&\%\%RYUJINX_TARGET_RELEASE_CHANNEL_NAME\%\%&${{ github.ref_name }}&g;' src/Ryujinx.Common/ReleaseInformation.cs
+          sed -r --in-place 's&\%\%RYUJINX_CONFIG_FILE_NAME\%\%&Config\.json&g;' src/Ryujinx.Common/ReleaseInformation.cs
         shell: bash
 
       - name: Create output dir
@@ -97,36 +100,79 @@ jobs:
 
       - name: Publish
         run: |
-          dotnet publish -c Release -r "${{ matrix.platform.name }}" -o ./publish_ava/publish -p:Version="${{ steps.version_info.outputs.build_version }}" -p:SourceRevisionId="${{ steps.version_info.outputs.git_short_hash }}" -p:DebugType=embedded src/Ryujinx --self-contained true
-          dotnet publish -c Release -r "${{ matrix.platform.name }}" -o ./publish_sdl2_headless/publish -p:Version="${{ steps.version_info.outputs.build_version }}" -p:SourceRevisionId="${{ steps.version_info.outputs.git_short_hash }}" -p:DebugType=embedded src/Ryujinx.Headless.SDL2 --self-contained true
+          dotnet publish -c Release -r "${{ matrix.platform.name }}" -o ./publish_ava -p:SourceRevisionId="${{ steps.version_info.outputs.git_short_hash }}" -p:DebugType=embedded src/Ryujinx --self-contained true
+          dotnet publish -c Release -r "${{ matrix.platform.name }}" -o ./publish_sdl2_headless -p:SourceRevisionId="${{ steps.version_info.outputs.git_short_hash }}" -p:DebugType=embedded src/Ryujinx.Headless.SDL2 --self-contained true
 
       - name: Packing Windows builds
         if: matrix.platform.os == 'windows-latest'
         run: |
+          BUILD_VERSION="${{ steps.version_info.outputs.build_version }}"
+          ZIP_OS_NAME="${{ matrix.platform.zip_os_name }}"
+
           pushd publish_ava
-          cp publish/Ryujinx.exe publish/Ryujinx.Ava.exe
-          7z a ../release_output/ryujinx-${{ steps.version_info.outputs.build_version }}-${{ matrix.platform.zip_os_name }}.zip publish
-          7z a ../release_output/test-ava-ryujinx-${{ steps.version_info.outputs.build_version }}-${{ matrix.platform.zip_os_name }}.zip publish
+          cp Ryujinx.exe Ryujinx.Ava.exe
+          7z a ../release_output/ryujinx-$BUILD_VERSION-$ZIP_OS_NAME.zip *
+          7z a ../release_output/test-ava-ryujinx-$BUILD_VERSION-$ZIP_OS_NAME.zip *
           popd
 
           pushd publish_sdl2_headless
-          7z a ../release_output/sdl2-ryujinx-headless-${{ steps.version_info.outputs.build_version }}-${{ matrix.platform.zip_os_name }}.zip publish
+          7z a ../release_output/sdl2-ryujinx-headless-$BUILD_VERSION-$ZIP_OS_NAME.zip *
+          popd
+        shell: bash
+
+      - name: Build AppImage (Linux)
+        if: matrix.platform.os == 'ubuntu-latest'
+        run: |
+          BUILD_VERSION="${{ steps.version_info.outputs.build_version }}"
+          PLATFORM_NAME="${{ matrix.platform.name }}"
+
+          sudo apt install -y zsync desktop-file-utils appstream
+
+          mkdir -p tools
+          export PATH="$PATH:$(readlink -f tools)"
+
+          # Setup appimagetool
+          wget -q -O tools/appimagetool "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
+          chmod +x tools/appimagetool
+
+          # Explicitly set $ARCH for appimagetool ($ARCH_NAME is for the file name)
+          if [ "$PLATFORM_NAME" = "linux-x64" ]; then
+            ARCH_NAME=x64
+            export ARCH=x86_64
+          elif [ "$PLATFORM_NAME" = "linux-arm64" ]; then
+            ARCH_NAME=arm64
+            export ARCH=aarch64
+          else
+            echo "Unexpected PLATFORM_NAME "$PLATFORM_NAME""
+            exit 1
+          fi
+
+          export UFLAG="gh-releases-zsync|${{ github.repository_owner }}|${{ github.event.repository.name }}|latest|*-$ARCH_NAME.AppImage.zsync"
+          BUILDDIR=publish_ava OUTDIR=publish_ava_appimage distribution/linux/appimage/build-appimage.sh
+
+          # Add to release output
+          pushd publish_ava_appimage
+          mv Ryujinx.AppImage ../release_output/ryujinx-$BUILD_VERSION-$ARCH_NAME.AppImage
+          mv Ryujinx.AppImage.zsync ../release_output/ryujinx-$BUILD_VERSION-$ARCH_NAME.AppImage.zsync
           popd
         shell: bash
 
       - name: Packing Linux builds
         if: matrix.platform.os == 'ubuntu-latest'
         run: |
+          BUILD_VERSION="${{ steps.version_info.outputs.build_version }}"
+          ZIP_OS_NAME="${{ matrix.platform.zip_os_name }}"
+
           pushd publish_ava
-          cp publish/Ryujinx publish/Ryujinx.Ava
-          chmod +x publish/Ryujinx.sh publish/Ryujinx.Ava publish/Ryujinx
-          tar -czvf ../release_output/ryujinx-${{ steps.version_info.outputs.build_version }}-${{ matrix.platform.zip_os_name }}.tar.gz publish
-          tar -czvf ../release_output/test-ava-ryujinx-${{ steps.version_info.outputs.build_version }}-${{ matrix.platform.zip_os_name }}.tar.gz publish
+          cp Ryujinx Ryujinx.Ava
+          chmod +x Ryujinx.sh Ryujinx Ryujinx.Ava
+          tar -czvf ../release_output/ryujinx-$BUILD_VERSION-$ZIP_OS_NAME.tar.gz *
+          tar -czvf ../release_output/test-ava-ryujinx-$BUILD_VERSION-$ZIP_OS_NAME.tar.gz *
           popd
 
           pushd publish_sdl2_headless
-          chmod +x publish/Ryujinx.sh publish/Ryujinx.Headless.SDL2
-          tar -czvf ../release_output/sdl2-ryujinx-headless-${{ steps.version_info.outputs.build_version }}-${{ matrix.platform.zip_os_name }}.tar.gz publish
+          chmod +x Ryujinx.sh Ryujinx.Headless.SDL2
+          tar -czvf ../release_output/sdl2-ryujinx-headless-$BUILD_VERSION-$ZIP_OS_NAME.tar.gz *
           popd
         shell: bash
 
@@ -134,20 +180,21 @@ jobs:
         uses: ncipollo/release-action@v1
         with:
           name: ${{ steps.version_info.outputs.build_version }}
-          artifacts: "release_output/*.tar.gz,release_output/*.zip"
           tag: ${{ steps.version_info.outputs.build_version }}
-          body: "For more information about this release please check out the official [Changelog](https://github.com/Ryujinx/Ryujinx/wiki/Changelog)."
+          artifacts: "release_output/*.tar.gz,release_output/*.zip,release_output/*AppImage*"
+          draft: "true"
+          omitBody: true
           #omitBodyDuringUpdate: true
           allowUpdates: true
           replacesArtifacts: true
           #owner: ${{ env.RYUJINX_TARGET_RELEASE_CHANNEL_OWNER }}
           #repo: ${{ env.RYUJINX_TARGET_RELEASE_CHANNEL_REPO }}
-          token: ${{ secrets.RELEASE_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
   macos_release:
     name: Release MacOS universal
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ fromJSON(vars.JOB_TIMEOUT) }}
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -175,17 +222,18 @@ jobs:
       - name: Get version info
         id: version_info
         run: |
-          echo "build_version=${{ env.RYUJINX_BASE_VERSION }}.${{ github.run_number }}" >> $GITHUB_OUTPUT
+          echo "build_version=r.`echo ${{ github.sha }} | cut -c1-7`" >> $GITHUB_OUTPUT
           echo "git_short_hash=$(git rev-parse --short "${{ github.sha }}")" >> $GITHUB_OUTPUT
+        shell: bash
 
       - name: Configure for release
         run: |
-          sed -r --in-place 's/\%\%RYUJINX_BUILD_VERSION\%\%/${{ steps.version_info.outputs.build_version }}/g;' src/Ryujinx.Common/ReleaseInformation.cs
-          sed -r --in-place 's/\%\%RYUJINX_BUILD_GIT_HASH\%\%/${{ steps.version_info.outputs.git_short_hash }}/g;' src/Ryujinx.Common/ReleaseInformation.cs
-          sed -r --in-place 's/\%\%RYUJINX_TARGET_RELEASE_CHANNEL_NAME\%\%/${{ env.RYUJINX_TARGET_RELEASE_CHANNEL_NAME }}/g;' src/Ryujinx.Common/ReleaseInformation.cs
-          sed -r --in-place 's/\%\%RYUJINX_TARGET_RELEASE_CHANNEL_OWNER\%\%/${{ env.RYUJINX_TARGET_RELEASE_CHANNEL_OWNER }}/g;' src/Ryujinx.Common/ReleaseInformation.cs
-          sed -r --in-place 's/\%\%RYUJINX_TARGET_RELEASE_CHANNEL_REPO\%\%/${{ env.RYUJINX_TARGET_RELEASE_CHANNEL_REPO }}/g;' src/Ryujinx.Common/ReleaseInformation.cs
-          sed -r --in-place 's/\%\%RYUJINX_CONFIG_FILE_NAME\%\%/Config\.json/g;' src/Ryujinx.Common/ReleaseInformation.cs
+          sed -r --in-place 's&\%\%RYUJINX_BUILD_VERSION\%\%&${{ steps.version_info.outputs.build_version }}&g;' src/Ryujinx.Common/ReleaseInformation.cs
+          sed -r --in-place 's&\%\%RYUJINX_BUILD_GIT_HASH\%\%&${{ steps.version_info.outputs.git_short_hash }}&g;' src/Ryujinx.Common/ReleaseInformation.cs
+          sed -r --in-place 's&\%\%RYUJINX_TARGET_RELEASE_CHANNEL_OWNER\%\%&${{ github.repository_owner }}&g;' src/Ryujinx.Common/ReleaseInformation.cs
+          sed -r --in-place 's&\%\%RYUJINX_TARGET_RELEASE_CHANNEL_REPO\%\%&${{ github.event.repository.name }}&g;' src/Ryujinx.Common/ReleaseInformation.cs
+          sed -r --in-place 's&\%\%RYUJINX_TARGET_RELEASE_CHANNEL_NAME\%\%&${{ github.ref_name }}&g;' src/Ryujinx.Common/ReleaseInformation.cs
+          sed -r --in-place 's&\%\%RYUJINX_CONFIG_FILE_NAME\%\%&Config\.json&g;' src/Ryujinx.Common/ReleaseInformation.cs
         shell: bash
 
       - name: Publish macOS Ryujinx
@@ -200,19 +248,36 @@ jobs:
         uses: ncipollo/release-action@v1
         with:
           name: ${{ steps.version_info.outputs.build_version }}
-          artifacts: "publish_ava/*.tar.gz, publish_headless/*.tar.gz"
           tag: ${{ steps.version_info.outputs.build_version }}
-          body: "For more information about this release please check out the official [Changelog](https://github.com/Ryujinx/Ryujinx/wiki/Changelog)."
+          artifacts: "publish_ava/*.tar.gz, publish_headless/*.tar.gz"
+          draft: "true"
+          omitBody: true
           #omitBodyDuringUpdate: true
           allowUpdates: true
           replacesArtifacts: true
           #owner: ${{ env.RYUJINX_TARGET_RELEASE_CHANNEL_OWNER }}
           #repo: ${{ env.RYUJINX_TARGET_RELEASE_CHANNEL_REPO }}
-          token: ${{ secrets.RELEASE_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-  flatpak_release:
-    uses: ./.github/workflows/flatpak.yml
-    needs: release
-    with:
-      ryujinx_version: "1.1.${{ github.run_number }}"
-    secrets: inherit
+  set_latest_release:
+    name: Set as latest release
+    runs-on: ubuntu-latest
+    needs: [release, macos_release]
+    steps:
+      - name: Get version info
+        id: version_info
+        run: |
+          echo "build_version=r.`echo ${{ github.sha }} | cut -c1-7`" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Update release
+        uses: ncipollo/release-action@v1
+        with:
+          name: ${{ steps.version_info.outputs.build_version }}
+          tag: ${{ steps.version_info.outputs.build_version }}
+          makeLatest: "true"
+          omitBody: true
+          allowUpdates: true
+          #owner: ${{ env.RYUJINX_TARGET_RELEASE_CHANNEL_OWNER }}
+          #repo: ${{ env.RYUJINX_TARGET_RELEASE_CHANNEL_REPO }}
+          token: ${{ secrets.GITHUB_TOKEN }}
